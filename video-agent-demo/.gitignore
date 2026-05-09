@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Runtime workspace keeps generated demo artifacts.
+workspace/projects/*/
+
+# Local env
+.env
+.env.*
