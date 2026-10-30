@@ -1,27 +1,57 @@
+"""Repair nodes: LLM-driven prompt rewriting from QA feedback."""
+
 from __future__ import annotations
 
-from agent.state import AgentState, add_event, current_shot, update_current_shot
+import json
+
+from agent.llm_client import get_llm
+from agent.nodes.image_nodes import shot_anchor
+from agent.prompts import REWRITE_IMAGE_SYSTEM, REWRITE_MOTION_SYSTEM
+from agent.state import AgentState, add_event, current_shot, track_usage, update_current_shot
 
 
 def rewrite_image_prompt(state: AgentState) -> AgentState:
     shot = current_shot(state)
     retry_count = shot.get("image_retry_count", 0) + 1
-    prompt = (
-        f"{shot['image_prompt']} 修正反馈：{shot.get('feedback', '')}。"
-        f"第 {retry_count} 次重试：加强主体、构图、光影和风格一致性。"
+    add_event(state, "Thought", f"根据质检反馈修复 {shot['id']} 的关键帧提示词。")
+
+    llm = get_llm()
+    request = (
+        f"原提示词：{shot.get('image_prompt', '')}\n"
+        f"原负面提示词：{shot.get('negative_prompt', '')}\n"
+        f"质检问题：{json.dumps(shot.get('feedback', ''), ensure_ascii=False)}\n"
+        f"分镜：{json.dumps(shot, ensure_ascii=False)}\n"
+        f"角色外观锚点（逐字保留）：{shot_anchor(state, shot)}"
     )
-    add_event(state, "Thought", f"根据图像评估反馈修正 {shot['id']} 的图片 prompt。")
-    add_event(state, "Decision", "重新调用图片生成工具。", {"retry_count": retry_count})
-    return update_current_shot(state, {"image_prompt": prompt, "image_retry_count": retry_count})
+    data, reply = llm.generate_json(REWRITE_IMAGE_SYSTEM, request, required_keys=("image_prompt",))
+    track_usage(state, f"{shot['id']}/repair_image", reply)
+    add_event(state, "Decision", data.get("change_log", "按质检反馈重写提示词。"), {"retry_count": retry_count})
+    return update_current_shot(
+        state,
+        {
+            "image_prompt": data["image_prompt"],
+            "negative_prompt": data.get("negative_prompt", shot.get("negative_prompt", "")),
+            "image_retry_count": retry_count,
+        },
+    )
 
 
 def rewrite_video_prompt(state: AgentState) -> AgentState:
     shot = current_shot(state)
     retry_count = shot.get("video_retry_count", 0) + 1
-    prompt = (
-        f"{shot['motion_prompt']} 修正反馈：{shot.get('feedback', '')}。"
-        f"第 {retry_count} 次重试：强化镜头运动、节奏、转场和情绪变化。"
+    add_event(state, "Thought", f"根据质检反馈修复 {shot['id']} 的运动提示词。")
+
+    llm = get_llm()
+    request = (
+        f"原运动提示词：{shot.get('motion_prompt', '')}\n"
+        f"质检问题：{json.dumps(shot.get('feedback', ''), ensure_ascii=False)}\n"
+        f"分镜：{json.dumps(shot, ensure_ascii=False)}\n"
+        f"时长：{shot['duration_s']} 秒"
     )
-    add_event(state, "Thought", f"根据视频评估反馈修正 {shot['id']} 的 motion prompt。")
-    add_event(state, "Decision", "重新调用视频生成工具。", {"retry_count": retry_count})
-    return update_current_shot(state, {"motion_prompt": prompt, "video_retry_count": retry_count})
+    data, reply = llm.generate_json(REWRITE_MOTION_SYSTEM, request, required_keys=("motion_prompt",))
+    track_usage(state, f"{shot['id']}/repair_video", reply)
+    add_event(state, "Decision", data.get("change_log", "按质检反馈重写运动提示词。"), {"retry_count": retry_count})
+    return update_current_shot(
+        state,
+        {"motion_prompt": data["motion_prompt"], "video_retry_count": retry_count},
+    )

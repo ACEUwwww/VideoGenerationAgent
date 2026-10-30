@@ -1,29 +1,47 @@
 import { assetUrl } from "../api";
-import type { Project } from "../types";
+import type { Shot } from "../types";
 
 interface Props {
-  project: Project | null;
+  projectId: string;
+  shot: Shot | null;
 }
 
-export function MediaPreview({ project }: Props) {
-  const state = project?.state;
-  const currentShot = state?.shots[state.current_shot_index] ?? state?.shots.at(-1);
-
+export function MediaPreview({ projectId, shot }: Props) {
   return (
-    <section className="panel">
-      <h2>Current Preview</h2>
-      {!project || !currentShot ? (
+    <section className="panel preview-panel">
+      <h2>镜头预览</h2>
+      {!shot ? (
         <p className="muted">暂无媒体结果。</p>
       ) : (
-        <>
-          <h3>{currentShot.title}</h3>
-          {currentShot.image_path && <img src={assetUrl(project.project_id, currentShot.image_path)} alt={currentShot.title} />}
-          {currentShot.video_path && (
-            <div className="mock-video">
-              Mock video file: <a href={assetUrl(project.project_id, currentShot.video_path)}>{currentShot.video_path}</a>
-            </div>
+        <div className="phone-frame">
+          {shot.video_path ? (
+            <video
+              key={shot.video_path}
+              src={assetUrl(projectId, shot.video_path)}
+              controls
+              playsInline
+              loop
+              muted
+            />
+          ) : shot.image_path ? (
+            <img src={assetUrl(projectId, shot.image_path)} alt={shot.id} />
+          ) : (
+            <div className="placeholder">待生成</div>
           )}
-        </>
+          {shot.dialogue && <p className="overlay-subtitle">{shot.dialogue}</p>}
+        </div>
+      )}
+      {shot && (
+        <dl className="preview-meta">
+          <dt>景别 / 运镜</dt>
+          <dd>{shot.shot_size} · {shot.camera}</dd>
+          <dt>场景</dt>
+          <dd>{shot.scene}</dd>
+          <dt>关键帧提示词</dt>
+          <dd className="mono">{shot.image_prompt || "-"}</dd>
+          <dt>运动提示词</dt>
+          <dd className="mono">{shot.motion_prompt || "-"}</dd>
+        </dl>
       )}
     </section>
   );

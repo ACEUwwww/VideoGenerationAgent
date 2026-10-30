@@ -1,0 +1,193 @@
+"""Volcengine Ark providers: Doubao Seedream (image) and Seedance (video).
+
+Both are paid per call. ``ARK_ALLOW_PAID=1`` must be set explicitly before a
+provider will spend money, so a stray ``IMAGE_PROVIDER=ark`` in .env cannot
+silently bill a full multi-shot run.
+
+Ark has no public URL for local files, so the keyframe is uploaded as a base64
+data URI in the ``first_frame`` role.
+"""
+
+from __future__ import annotations
+
+import base64
+import time
+from pathlib import Path
+
+import httpx
+
+from agent.settings import get_settings
+from mcp_servers.providers.base import ImageRequest, VideoRequest
+
+POLL_INTERVAL_S = 6.0
+VIDEO_TIMEOUT_S = 900.0
+# A create call is the money-spending step: retry only what cannot be billed
+# twice (connection errors, 429, 5xx). A 4xx business error is raised at once.
+CREATE_ATTEMPTS = 3
+RETRYABLE_STATUS = (429, 500, 502, 503, 504)
+
+
+def _post_with_retry(url: str, headers: dict, payload: dict, *, timeout: float, attempts: int = CREATE_ATTEMPTS) -> dict:
+    """POST with bounded retry on connection errors and transient statuses."""
+    last = ""
+    for attempt in range(attempts):
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(url, headers=headers, json=payload)
+        except httpx.HTTPError as exc:
+            last = f"{type(exc).__name__}: {exc}"
+            time.sleep(2**attempt)
+            continue
+        if response.status_code in RETRYABLE_STATUS:
+            last = f"HTTP {response.status_code}: {response.text[:300]}"
+            time.sleep(2**attempt)
+            continue
+        if response.status_code != 200:
+            raise RuntimeError(f"Ark HTTP {response.status_code}: {response.text[:500]}")
+        return response.json()
+    raise RuntimeError(f"Ark call failed after {attempts} attempts: {last}")
+
+
+def _credentials(kind: str) -> tuple[str, str, str]:
+    import os
+
+    if os.environ.get("ARK_ALLOW_PAID") != "1":
+        raise RuntimeError(
+            f"Ark {kind} provider is paid and disabled. Set ARK_ALLOW_PAID=1 for an explicit paid test run."
+        )
+    media = get_settings().media
+    base_url = media.ark_base_url.rstrip("/")
+    api_key = media.ark_api_key
+    if not api_key:
+        raise RuntimeError("ARK_API_KEY is empty")
+    model = media.ark_image_model if kind == "image" else media.ark_video_model
+    if not model:
+        raise RuntimeError(f"ARK_{kind.upper()}_MODEL is empty")
+    return base_url, api_key, model
+
+
+class ArkImageProvider:
+    """POST /images/generations — Doubao Seedream."""
+
+    name = "ark"
+
+    def generate(self, request: ImageRequest) -> dict:
+        base_url, api_key, model = _credentials("image")
+        payload = {
+            "model": model,
+            "prompt": request.prompt,
+            "size": f"{request.width}x{request.height}",
+            "response_format": "b64_json",
+            "watermark": False,
+            "sequential_image_generation": "disabled",
+        }
+        if request.negative_prompt:
+            payload["negative_prompt"] = request.negative_prompt
+        if request.seed:
+            payload["seed"] = request.seed
+        reference = ""
+        if request.reference_image:
+            reference = _data_uri(request.reference_image)
+            payload["image"] = reference
+
+        body = _post_with_retry(
+            f"{base_url}/images/generations",
+            {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            payload,
+            timeout=300,
+        )
+        data = body["data"][0]
+        if data.get("b64_json"):
+            raw = base64.b64decode(data["b64_json"])
+        else:
+            raw = httpx.get(data["url"], timeout=300).content
+
+        target = request.project_dir / "images" / f"{request.shot_id}.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+        return {
+            "image_path": str(target.relative_to(request.project_dir)),
+            "provider": self.name,
+            "model": model,
+            "prompt": request.prompt,
+            "negative_prompt": request.negative_prompt,
+            "usage": body.get("usage", {}),
+            "width": request.width,
+            "height": request.height,
+            "reference_image": str(request.reference_image) if request.reference_image else "",
+        }
+
+
+class ArkVideoProvider:
+    """POST /contents/generations/tasks — Doubao Seedance, async + polling."""
+
+    name = "ark"
+
+    def generate(self, request: VideoRequest) -> dict:
+        base_url, api_key, model = _credentials("video")
+        image_uri = _data_uri(request.image_path)
+        payload = {
+            "model": model,
+            "content": [
+                {"type": "text", "text": request.motion_prompt},
+                {"type": "image_url", "image_url": {"url": image_uri}, "role": "first_frame"},
+            ],
+            "ratio": "9:16",
+            "resolution": get_settings().media.ark_video_resolution,
+            "duration": int(round(request.duration_s)),
+            "watermark": False,
+        }
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+        created = _post_with_retry(f"{base_url}/contents/generations/tasks", headers, payload, timeout=120)
+        task_id = created["id"]
+
+        started = time.monotonic()
+        video_url = ""
+        last_poll_error = ""
+        with httpx.Client(timeout=120) as client:
+            while time.monotonic() - started < VIDEO_TIMEOUT_S:
+                time.sleep(POLL_INTERVAL_S)
+                try:
+                    poll = client.get(f"{base_url}/contents/generations/tasks/{task_id}", headers=headers)
+                except httpx.HTTPError as exc:
+                    last_poll_error = f"{type(exc).__name__}: {exc}"
+                    continue
+                if poll.status_code != 200:
+                    last_poll_error = f"HTTP {poll.status_code}: {poll.text[:200]}"
+                    continue
+                body = poll.json()
+                status = body.get("status")
+                if status == "succeeded":
+                    video_url = body["content"]["video_url"]
+                    break
+                if status in ("failed", "cancelled"):
+                    raise RuntimeError(f"Ark video task {task_id} {status}: {body.get('error')}")
+            if not video_url:
+                raise RuntimeError(
+                    f"Ark video task {task_id} timed out after {VIDEO_TIMEOUT_S}s (last poll error: {last_poll_error or 'none'})"
+                )
+
+            raw = client.get(video_url, timeout=600).content
+        usage = body.get("usage", {})
+
+        target = request.project_dir / "videos" / f"{request.shot_id}.mp4"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+        return {
+            "video_path": str(target.relative_to(request.project_dir)),
+            "provider": self.name,
+            "model": model,
+            "task_id": task_id,
+            "motion_prompt": request.motion_prompt,
+            "duration_s": request.duration_s,
+            "resolution": body.get("resolution", ""),
+            "usage": usage,
+        }
+
+
+def _data_uri(path: Path) -> str:
+    suffix = path.suffix.lower().lstrip(".") or "png"
+    mime = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp"}.get(suffix, "png")
+    encoded = base64.b64encode(Path(path).read_bytes()).decode("ascii")
+    return f"data:image/{mime};base64,{encoded}"

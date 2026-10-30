@@ -14,8 +14,6 @@ async def run_project_agent(project_id: str) -> None:
 def _run_project_agent_sync(project_id: str) -> None:
     try:
         state = project_store.load_state(project_id)
-        state["status"] = "running"
-        project_store.save_state(project_id, state)
         event_store.append_event(project_id, "Thought", "Agent 后台任务启动。")
         run_agent(state)
     except Exception as exc:  # pragma: no cover - surfaced through events for the demo UI.

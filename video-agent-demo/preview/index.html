@@ -1,0 +1,541 @@
+<title>深夜便利店 · 竖屏短剧样片</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* Palette: cold monitor light in a night convenience store.
+     ink / 冷光 / 荧光灯白 / 血迹红 / 划痕灰 */
+  :root {
+    color-scheme: light;
+    --ink: #0d1117;
+    --ink-soft: #1b2330;
+    --cold: #2c4a5e;
+    --paper: #eef1f4;
+    --paper-raised: #ffffff;
+    --fluorescent: #f2f6f8;
+    --text: #101820;
+    --text-dim: #5a6572;
+    --rule: #cfd8e0;
+    --accent: #a3242b;
+    --accent-soft: #f0d9da;
+    --good: #1f6b4a;
+    --warn: #9a5b12;
+    --display: "Noto Serif SC", "Songti SC", serif;
+    --body: "Noto Sans SC", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+    --gutter: max(20px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(20px, env(safe-area-inset-right, 0px));
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ink: #0a0d12;
+      --ink-soft: #141a23;
+      --cold: #7ea7bd;
+      --paper: #0d1117;
+      --paper-raised: #161d26;
+      --fluorescent: #141a23;
+      --text: #e8edf2;
+      --text-dim: #94a3b1;
+      --rule: #26303c;
+      --accent: #d4575f;
+      --accent-soft: #35202a;
+      --good: #4fb98a;
+      --warn: #d39a4e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #0a0d12;
+    --ink-soft: #141a23;
+    --cold: #7ea7bd;
+    --paper: #0d1117;
+    --paper-raised: #161d26;
+    --fluorescent: #141a23;
+    --text: #e8edf2;
+    --text-dim: #94a3b1;
+    --rule: #26303c;
+    --accent: #d4575f;
+    --accent-soft: #35202a;
+    --good: #4fb98a;
+    --warn: #d39a4e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding-block: 0;
+    padding-left: var(--gutter);
+    padding-right: var(--gutter-r);
+    background: var(--paper);
+    color: var(--text);
+    font-family: var(--body);
+    font-weight: 400;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-block: clamp(28px, 5vw, 56px);
+    display: grid;
+    gap: clamp(32px, 5vw, 56px);
+  }
+
+  .masthead {
+    display: grid;
+    gap: 18px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--text);
+  }
+
+  .eyebrow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .eyebrow .stamp {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 900;
+    font-size: clamp(34px, 6.4vw, 62px);
+    line-height: 1.08;
+    letter-spacing: 0.02em;
+    text-wrap: balance;
+  }
+
+  .logline {
+    margin: 0;
+    max-width: 34em;
+    font-size: clamp(15px, 1.9vw, 18px);
+    color: var(--text-dim);
+    font-weight: 300;
+  }
+
+  /* Hero: the phone frame is the subject, everything else stays quiet. */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(220px, 300px) 1fr;
+    gap: clamp(24px, 4vw, 48px);
+    align-items: start;
+  }
+
+  .phone {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--rule);
+  }
+
+  .phone video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+  }
+
+  .phone-tag {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #f2f6f8;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .hero-side {
+    display: grid;
+    gap: 20px;
+    align-content: start;
+  }
+
+  .hero-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+
+  .fact {
+    background: var(--paper-raised);
+    padding: 12px 14px;
+    display: grid;
+    gap: 2px;
+  }
+
+  .fact dt {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .fact dd {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .note {
+    margin: 0;
+    padding: 14px 16px;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    font-size: 13.5px;
+    line-height: 1.65;
+  }
+
+  .note strong { font-weight: 700; }
+
+  h2 {
+    margin: 0 0 4px;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(20px, 2.6vw, 26px);
+    letter-spacing: 0.02em;
+  }
+
+  .section-head {
+    display: grid;
+    gap: 2px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 18px;
+  }
+
+  .section-head p {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* Cast: appearance anchors are the point, so show them verbatim. */
+  .cast {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+
+  .actor {
+    border: 1px solid var(--rule);
+    background: var(--paper-raised);
+    padding: 16px 18px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .actor header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .actor h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 19px;
+    font-weight: 600;
+  }
+
+  .role {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid currentColor;
+    padding: 1px 6px;
+  }
+
+  .anchor-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .anchor-text {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--text);
+    padding: 10px 12px;
+    background: var(--fluorescent);
+    border-left: 2px solid var(--cold);
+  }
+
+  .actor .persona {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* Score table: numbers carry the argument, so tabular and rule-aligned. */
+  .score-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .score-table th,
+  .score-table td {
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .score-table th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  .score-table td.dim { font-family: var(--mono); font-size: 12px; }
+  .score-table td.num { text-align: right; width: 84px; }
+  .score-table td.bar-cell { width: 34%; }
+
+  .track {
+    display: block;
+    height: 7px;
+    background: var(--rule);
+    position: relative;
+  }
+
+  .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--good);
+  }
+
+  .fill.warn { background: var(--warn); }
+  .fill.bad { background: var(--accent); }
+
+  .total-row td {
+    border-bottom: none;
+    border-top: 2px solid var(--text);
+    padding-top: 12px;
+    font-weight: 700;
+  }
+
+  .scroll { overflow-x: auto; }
+
+  .stills {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+  }
+
+  figure {
+    margin: 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  figure img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid var(--rule);
+    background: var(--ink);
+  }
+
+  figcaption {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .pipeline {
+    display: grid;
+    gap: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    border-left: 2px solid var(--cold);
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 14px;
+    padding: 7px 0 7px 14px;
+    border-bottom: 1px dotted var(--rule);
+  }
+
+  .step:last-child { border-bottom: none; }
+  .step span:first-child { color: var(--cold); font-weight: 600; }
+  .step span:last-child { color: var(--text-dim); }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.9;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 720px) {
+    .hero { grid-template-columns: 1fr; }
+    .phone { max-width: 300px; margin: 0 auto; }
+    .step { grid-template-columns: 1fr; gap: 2px; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow">
+      <span class="stamp">LangGraph · DeepSeek · Seedance 1.0</span>
+      <span>project_e5118a3b</span>
+      <span>2026-10-30</span>
+    </div>
+    <h1>深夜便利店</h1>
+    <p class="logline">深夜便利店店员在监控里看到自己，却不知身后还站着另一个。——悬疑 · 冷调惊悚 · 竖屏 9:16</p>
+  </header>
+
+  <section class="hero">
+    <div class="phone">
+      <video src="clip.mp4" controls playsinline loop muted preload="metadata"></video>
+      <span class="phone-tag">1080 × 1920 · 3.06s</span>
+    </div>
+    <div class="hero-side">
+      <dl class="hero-facts">
+        <div class="fact"><dt>关键帧</dt><dd>mock 渲染</dd></div>
+        <div class="fact"><dt>视频</dt><dd>Seedance 真生成</dd></div>
+        <div class="fact"><dt>成片</dt><dd>h264 + AAC</dd></div>
+        <div class="fact"><dt>综合评分</dt><dd>0.823 / 1.00</dd></div>
+      </dl>
+      <p class="note"><strong>样片说明：</strong>关键帧由本地 mock 渲染器绘制（分镜卡），视频段由火山方舟 Seedance 1.0 真实生成（480p 图生视频），再由 ffmpeg 上采样合成到 1080×1920。无配音内容，音轨为静音 AAC。</p>
+      <h2 style="margin-top:6px">一句台词</h2>
+      <p style="margin:0;font-family:var(--display);font-size:20px;line-height:1.6">「监控里那个我，为什么比我先抬头。」</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>角色设定</h2>
+      <p>appearance anchor · 逐镜复用的外观锚点</p>
+    </div>
+    <div class="cast">
+      <article class="actor">
+        <header><h3>林晚</h3><span class="role">主角</span></header>
+        <p class="persona">22 岁店员，值夜班第三个月，习惯盯着监控屏幕发呆。</p>
+        <span class="anchor-label">外观锚点</span>
+        <p class="anchor-text">Black shoulder-length hair with blunt bangs, pale skin, small mole under the left eye, light grey convenience-store uniform with a red name tag, tired eyes.</p>
+      </article>
+      <article class="actor">
+        <header><h3>另一个自己</h3><span class="role">镜像</span></header>
+        <p class="persona">监控画面里的倒影，动作比她慢半拍，表情却更早出现。</p>
+        <span class="anchor-label">外观锚点</span>
+        <p class="anchor-text">Identical to 林晚 in face and clothing, but the name tag is blank, hair is dry while hers is damp, and the eyes never blink.</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>分镜与评分</h2>
+      <p>video-bench 维度体系 · 本地像素测量</p>
+    </div>
+    <div class="scroll">
+      <table class="score-table">
+        <thead>
+          <tr><th>维度</th><th>权重</th><th>条</th><th class="num">得分</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="dim">imaging_quality</td><td>0.15</td><td class="bar-cell"><span class="track"><span class="fill" style="width:83.7%"></span></span></td><td class="num">0.837</td></tr>
+          <tr><td class="dim">aesthetic_quality</td><td>0.15</td><td class="bar-cell"><span class="track"><span class="fill" style="width:79.7%"></span></span></td><td class="num">0.797</td></tr>
+          <tr><td class="dim">temporal_consistency</td><td>0.20</td><td class="bar-cell"><span class="track"><span class="fill" style="width:94.1%"></span></span></td><td class="num">0.941</td></tr>
+          <tr><td class="dim">motion_effects</td><td>0.15</td><td class="bar-cell"><span class="track"><span class="fill" style="width:100%"></span></span></td><td class="num">1.000</td></tr>
+          <tr><td class="dim">color_consistency</td><td>0.10</td><td class="bar-cell"><span class="track"><span class="fill" style="width:94.7%"></span></span></td><td class="num">0.947</td></tr>
+          <tr><td class="dim">scene_consistency</td><td>0.15</td><td class="bar-cell"><span class="track"><span class="fill warn" style="width:51.2%"></span></span></td><td class="num">0.512</td></tr>
+          <tr><td class="dim">object_consistency</td><td>0.10</td><td class="bar-cell"><span class="track"><span class="fill warn" style="width:68.6%"></span></span></td><td class="num">0.686</td></tr>
+          <tr class="total-row"><td>综合</td><td>—</td><td>门槛 0.62 · 通过</td><td class="num">0.823</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:18px"><strong>一处已知问题：</strong>初版阈值按 mock 分镜卡校准（帧间差约 4），在真实 Seedance 片段（帧间差 18.9、闪烁 8.8）上把正常运镜误判成抖动，motion 得 0 分、综合只有 0.518。改成区间打分后，同一段素材重算为 0.823。</p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>画面</h2>
+      <p>mock 关键帧 → Seedance 视频 → 合成成片</p>
+    </div>
+    <div class="stills">
+      <figure>
+        <img src="mockframe_s.png" alt="mock 生成的竖屏分镜卡">
+        <figcaption>01 关键帧（mock 渲染的分镜卡，1080×1920）</figcaption>
+      </figure>
+      <figure>
+        <img src="keyframe_s.png" alt="Seedance 视频中抽取的关键帧">
+        <figcaption>02 成片关键帧（Seedance 真实生成，作为一致性锚点）</figcaption>
+      </figure>
+      <figure>
+        <img src="cover.png" alt="成片封面">
+        <figcaption>03 封面（logline 烧录）</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>这次实际跑过的链路</h2>
+      <p>单镜 · 90.8 秒 · 6 次 LLM 调用</p>
+    </div>
+    <div class="pipeline">
+      <div class="step"><span>analyze_user_goal</span><span>确定题材、风格、镜头数</span></div>
+      <div class="step"><span>plan_story</span><span>DeepSeek 生成设定集与两个角色的外观锚点</span></div>
+      <div class="step"><span>plan_shots</span><span>DeepSeek 生成 1 个分镜（特写 / 3s）</span></div>
+      <div class="step"><span>generate_image_prompt</span><span>英文关键帧提示词，逐字嵌入外观锚点</span></div>
+      <div class="step"><span>generate_image</span><span>mock provider 渲染分镜卡</span></div>
+      <div class="step"><span>evaluate_image</span><span>文件级质检 → 未过，触发一次提示词修复</span></div>
+      <div class="step"><span>generate_video_prompt</span><span>英文运动提示词</span></div>
+      <div class="step"><span>generate_video</span><span>Seedance 图生视频，首帧以 data URI 传入</span></div>
+      <div class="step"><span>evaluate_clip</span><span>抽关键帧写入记忆 + 七维打分</span></div>
+      <div class="step"><span>compose_video</span><span>ffmpeg 归一化 → 上采样 1080×1920 → 封面</span></div>
+    </div>
+  </section>
+
+  <footer>
+    LangGraph 状态机 · DeepSeek deepseek-chat 规划 · 火山方舟 doubao-seedance-1-0-pro-fast-251015<br>
+    输入 6,761 tokens / 输出 2,188 tokens · 19 项 pytest 全绿 · 评分维度借鉴 Video-Bench
+  </footer>
+</div>

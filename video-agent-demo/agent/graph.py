@@ -15,9 +15,11 @@ from agent.nodes.video_nodes import (
     advance_shot,
     call_evaluate_video,
     call_generate_video,
+    evaluate_clip_multidim,
     generate_video_prompt,
     has_more_shots,
     should_retry_video,
+    synthesize_dialogue,
 )
 from agent.state import AgentState
 
@@ -36,6 +38,8 @@ def build_graph():
     graph.add_node("generate_video", call_generate_video)
     graph.add_node("evaluate_video", call_evaluate_video)
     graph.add_node("rewrite_video_prompt", rewrite_video_prompt)
+    graph.add_node("evaluate_clip", evaluate_clip_multidim)
+    graph.add_node("synthesize_dialogue", synthesize_dialogue)
     graph.add_node("advance_shot", advance_shot)
     graph.add_node("compose_video", compose_video)
     graph.add_node("finish", finish)
@@ -57,9 +61,11 @@ def build_graph():
     graph.add_conditional_edges(
         "evaluate_video",
         should_retry_video,
-        {"retry": "rewrite_video_prompt", "next": "advance_shot"},
+        {"retry": "rewrite_video_prompt", "next": "evaluate_clip"},
     )
     graph.add_edge("rewrite_video_prompt", "generate_video")
+    graph.add_edge("evaluate_clip", "synthesize_dialogue")
+    graph.add_edge("synthesize_dialogue", "advance_shot")
     graph.add_conditional_edges(
         "advance_shot",
         has_more_shots,
