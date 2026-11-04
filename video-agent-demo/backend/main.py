@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.schemas import ProjectCreate
 from agent.settings import get_settings
@@ -13,9 +15,18 @@ from mcp_servers.videobench_eval import DIMENSIONS
 
 app = FastAPI(title="Lightweight Video Generation Agent Demo")
 
+# Same-origin serving needs no CORS at all; the list exists only for the
+# separate Vite dev server. CORS_ORIGINS adds hosts when the UI is opened from
+# another machine's address rather than through the API port itself.
+_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+_ORIGINS += [origin for origin in os.environ.get("CORS_ORIGINS", "").split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,3 +106,11 @@ def get_asset(project_id: str, filename: str) -> FileResponse:
     if not str(path).startswith(str(root)) or not path.exists():
         raise HTTPException(status_code=404, detail="Asset not found")
     return FileResponse(path)
+
+
+# The built frontend is mounted last so /api/* and /health keep priority over
+# the catch-all. Serving it here means one exposed port covers the UI and the
+# API on the same origin, which also removes CORS from the picture.
+_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+if _DIST.is_dir():
+    app.mount("/", StaticFiles(directory=_DIST, html=True), name="ui")

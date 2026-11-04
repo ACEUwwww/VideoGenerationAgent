@@ -1,6 +1,9 @@
 import type { AgentEvent, Project, ProjectCreateInput, RuntimeConfig } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+// Empty base means same-origin: the FastAPI app serves the built UI, so the
+// browser talks to whatever host and port it loaded the page from. Only the
+// separate Vite dev server needs an explicit address.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export interface ProjectSummary {
   project_id: string;
