@@ -15,6 +15,7 @@ import base64
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -108,7 +109,7 @@ def _report(kind: str, response: httpx.Response, started: float) -> int:
         return 1
     data = body["data"][0]
     raw = base64.b64decode(data["b64_json"]) if data.get("b64_json") else httpx.get(data["url"]).content
-    out = Path("/tmp/ark_smoke.png")
+    out = Path(tempfile.gettempdir()) / "ark_smoke.png"
     out.write_bytes(raw)
     print(f"  ok, {len(raw)} bytes -> {out}, usage={body.get('usage')}")
     return 0

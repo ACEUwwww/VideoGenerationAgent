@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from mcp_servers.providers.ffmpeg_utils import ffmpeg_bin
+from mcp_servers.providers.ffmpeg_utils import NO_WINDOW, ffmpeg_bin
 
 THUMB = (96, 170)
 
@@ -33,6 +33,7 @@ def extract_frames(video_path: Path, count: int = 8, width: int = 192) -> list[n
                 str(out),
             ],
             capture_output=True, text=True, timeout=180,
+            encoding="utf-8", errors="replace", creationflags=NO_WINDOW,
         )
         files = sorted(Path(tmp).glob("f*.png"))
         if proc.returncode != 0 or not files:

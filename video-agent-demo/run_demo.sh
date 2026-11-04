@@ -21,27 +21,8 @@ need_venv() {
 case "${1:-check}" in
   check)
     need_venv
-    echo "== 依赖 =="
-    for bin in ffmpeg ffprobe; do
-      command -v "$bin" >/dev/null || { echo "缺少 $bin，执行 apt-get install -y ffmpeg"; exit 1; }
-    done
-    fc-match "Noto Sans CJK SC" >/dev/null 2>&1 || { echo "缺少中文字体，执行 apt-get install -y fonts-noto-cjk"; exit 1; }
-    echo "ffmpeg / 中文字体 OK"
-    echo "== 配置 =="
     [[ -f .env ]] || { echo "缺少 .env，执行 cp .env.example .env 并填入 key"; exit 1; }
-    "$PY" - <<'PYEOF'
-from agent.settings import get_settings
-from mcp_servers.providers import provider_report
-s = get_settings()
-print("LLM:", s.llm.model, "| key set:", bool(s.llm.api_key))
-print("providers:", provider_report())
-print("image model:", s.media.ark_image_model, "| video model:", s.media.ark_video_model)
-print("video resolution:", s.media.ark_video_resolution)
-print("tts:", s.media.tts_provider, "| model:", s.media.tts_model, "| key set:", bool(s.media.tts_api_key))
-if s.media.tts_provider != "mock" and not s.media.tts_api_key:
-    print("  警告: TTS_PROVIDER 不是 mock 但 TTS_API_KEY 为空，配音会失败")
-PYEOF
-    "$PY" scripts/ark_smoke.py --kind status
+    "$PY" scripts/doctor.py
     ;;
   test)
     need_venv

@@ -9,6 +9,7 @@ directory, which is what the frontend serves.
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
 from mcp_servers.providers import (
@@ -19,7 +20,7 @@ from mcp_servers.providers import (
     get_speech_provider,
     get_video_provider,
 )
-from mcp_servers.providers.ffmpeg_utils import ffmpeg_bin, font_path, media_facts, run
+from mcp_servers.providers.ffmpeg_utils import ffmpeg_bin, font_path, font_family, media_facts, run
 
 from agent.settings import PROJECTS_ROOT, get_settings
 
@@ -307,7 +308,7 @@ def _write_ass(root: Path, lines: list[dict], media) -> Path:
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        "Style: Default,Noto Sans CJK SC,64,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+        f"Style: Default,{font_family()},64,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
         "-1,0,0,0,100,100,0,0,1,4,2,2,80,80,260,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
@@ -332,7 +333,15 @@ def _ass_time(seconds: float) -> str:
 
 
 def _escape_filter_path(path: Path | str) -> str:
-    return str(path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    """Escape a filesystem path for use inside an ffmpeg filter argument.
+
+    Forward slashes work on every platform and avoid the backslash doubling
+    that Windows paths otherwise need. The drive colon must still be escaped,
+    because ffmpeg reads ':' inside a filter value as an option separator.
+    """
+    candidate = Path(path)
+    text = candidate.as_posix() if candidate.is_absolute() else str(path).replace("\\", "/")
+    return text.replace("'", "\\'").replace(":", "\\:").replace("[", "\\[").replace("]", "\\]")
 
 
 def _escape_drawtext(text: str) -> str:

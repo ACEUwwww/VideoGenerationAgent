@@ -16,7 +16,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from mcp_servers.providers.base import ImageRequest, SpeechRequest, VideoRequest
-from mcp_servers.providers.ffmpeg_utils import ffmpeg_bin, font_path, run
+from mcp_servers.providers.ffmpeg_utils import NO_WINDOW, ffmpeg_bin, font_path, run
 
 PALETTE = (
     ((14, 18, 32), (58, 40, 84)),
@@ -199,6 +199,9 @@ class MockSpeechProvider:
             capture_output=True,
             text=True,
             timeout=120,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=NO_WINDOW,
         )
         if proc.returncode != 0:
             raise RuntimeError(f"silent audio generation failed: {proc.stderr[-600:]}")

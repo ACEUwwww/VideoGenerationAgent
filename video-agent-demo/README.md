@@ -31,22 +31,60 @@ tests/             pytest：全链路、指标、provider
 
 ## 2. 启动
 
+支持 Linux、macOS 和 Windows。三者的差别只在依赖安装方式，Python 代码完全一致。
+
+### Linux / macOS
+
 ```bash
 cd video-agent-demo
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env      # 填入 DEEPSEEK_API_KEY
+cp .env.example .env                    # 填入 DEEPSEEK_API_KEY / ARK_API_KEY / TTS_API_KEY
 
-# 系统依赖：ffmpeg（合成/抽帧/字幕烧录）+ 中文字体
+# Linux 需要装 ffmpeg 与中文字体；macOS 用 brew install ffmpeg，字体自带
 apt-get install -y ffmpeg fonts-noto-cjk
 
+./run_demo.sh check                     # 环境自检，零成本
 .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
-前端：
+### Windows
+
+```bat
+cd video-agent-demo
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+copy .env.example .env                  :: 填入三个 key
+
+:: ffmpeg 需自带 libass，否则字幕无法烧录
+winget install Gyan.FFmpeg
+:: 或者从 https://www.gyan.dev/ffmpeg/builds/ 下载 full 版本并加入 PATH
+
+run_demo.bat check                      :: 环境自检，零成本
+.venv\Scripts\uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+Windows 三处需要注意：
+
+- **ffmpeg 必须包含 libass**。`full` 构建默认带，`essentials` 也可能带，但精简版没有。`run_demo.bat check` 会直接检测并给出结论。
+- **中文字体**：Windows 10+ 自带微软雅黑（`C:\Windows\Fonts\msyh.ttc`），会自动识别。若装在精简镜像里缺失，设置环境变量 `CJK_FONT_PATH` 指向任意中文字体文件即可，`CJK_FONT_FAMILY` 可另行指定 ASS 字幕使用的字体族名。
+- **控制台窗口**：所有 ffmpeg 子进程都带 `CREATE_NO_WINDOW`，不会闪烁黑框。
+
+### 前端（两个平台相同）
 
 ```bash
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
+
+### 命令对照
+
+| 用途 | Linux / macOS | Windows |
+|---|---|---|
+| 环境自检 | `./run_demo.sh check` | `run_demo.bat check` |
+| 跑测试 | `./run_demo.sh test` | `run_demo.bat test` |
+| 零成本试跑 | `./run_demo.sh simulate` | `run_demo.bat simulate` |
+| 启动后端 | `./run_demo.sh serve` | `run_demo.bat serve` |
+
+两套脚本只是入口，实际逻辑在 `scripts/doctor.py` 与 `scripts/simulate.py`，Python 代码跨平台共用。
 
 ## 3. Pipeline
 
@@ -147,6 +185,8 @@ VIDEO_PROVIDER=mock|ark
 | `TTS_MODEL` / `TTS_BASE_URL` | 默认 `seed-audio-1.0` / openspeech v3 |
 | `ARK_ALLOW_PAID` | `1` 才允许真实付费调用 |
 | `VIDEO_WIDTH` / `VIDEO_HEIGHT` / `VIDEO_FPS` | 画布，默认 1080×1920@30 |
+| `CJK_FONT_PATH` | 手动指定中文字体文件（自动探测失败时用） |
+| `CJK_FONT_FAMILY` | 手动指定 ASS 字幕字体族名 |
 
 ## 6. 本地产物
 

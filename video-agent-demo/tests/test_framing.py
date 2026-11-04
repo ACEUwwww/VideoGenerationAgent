@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from mcp_servers.metrics import center_crop, compare_to_reference
+from mcp_servers.providers.ffmpeg_utils import NO_WINDOW
 from mcp_servers.videobench_eval import DIMENSIONS, evaluate_clip
 
 pytestmark = pytest.mark.skipif(
@@ -30,6 +31,7 @@ def _clip(tmp_path: Path, frames: int = 6) -> Path:
         ],
         capture_output=True,
         check=True,
+        creationflags=NO_WINDOW,
     )
     return out
 

@@ -241,29 +241,54 @@ ASS 字幕使用 Noto Sans CJK，64px 白字黑边，底部居中留 260px 边�
 
 ### 5.1 首次安装
 
-```bash
-# 系统依赖
-apt-get install -y ffmpeg fonts-noto-cjk
+**Linux / macOS**
 
-# Python 依赖
+```bash
+apt-get install -y ffmpeg fonts-noto-cjk     # macOS: brew install ffmpeg
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-
-# 前端依赖
 cd frontend && npm install && cd ..
-
-# 配置
 cp .env.example .env
-# 编辑 .env，填入 DEEPSEEK_API_KEY / ARK_API_KEY / TTS_API_KEY
 ```
+
+**Windows**
+
+```bat
+winget install Gyan.FFmpeg
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+cd frontend && npm install && cd ..
+copy .env.example .env
+```
+
+Windows 上与平台相关的只有三处，代码本身完全一致：
+
+| 项 | 处理方式 |
+|---|---|
+| 中文字体 | 自动探测 `C:\Windows\Fonts\msyh.ttc`（微软雅黑）；缺失时用 `CJK_FONT_PATH` 指定 |
+| ASS 字幕字体族 | 按字体文件自动映射（msyh→Microsoft YaHei）；可用 `CJK_FONT_FAMILY` 覆盖 |
+| 控制台窗口 | ffmpeg 子进程带 `CREATE_NO_WINDOW`，不闪黑框 |
+
+**ffmpeg 必须包含 libass**，否则 `ass=` 字幕滤镜不可用。Gyan 的 `full` 构建包含它，`run_demo.bat check` 会实测确认。
+
+两个平台的启动脚本只是入口：
+
+| 用途 | Linux / macOS | Windows |
+|---|---|---|
+| 自检 | `./run_demo.sh check` | `run_demo.bat check` |
+| 测试 | `./run_demo.sh test` | `run_demo.bat test` |
+| 零成本试跑 | `./run_demo.sh simulate` | `run_demo.bat simulate` |
+| 启动后端 | `./run_demo.sh serve` | `run_demo.bat serve` |
+
+实际逻辑在 `scripts/doctor.py` 和 `scripts/simulate.py`，Python 侧共用同一份代码。
 
 ### 5.2 环境自检（零成本）
 
 ```bash
-./run_demo.sh check
+./run_demo.sh check        # Windows: run_demo.bat check
 ```
 
-输出会列出 LLM 配置、三个 provider 的当前选择、模型名、分辨率，以及 Ark 模型的开通状态。不会产生任何费用。
+检查项：ffmpeg 与 libass、ffprobe、中文字体文件与字体族映射、三套凭据是否齐全、三个 provider 的当前选择、画布与分辨率。不会产生任何费用。
 
 ### 5.3 跑测试
 
