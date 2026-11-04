@@ -84,3 +84,30 @@ def test_subject_consistency_ignores_camera_move():
     assert result["subject_consistency"] > 0.95
     drifted = [np.clip(reference * 0.2 + 60, 0, 255)]
     assert compare_to_reference(drifted, reference)["subject_consistency"] < result["subject_consistency"]
+
+
+def test_compact_memory_drops_fingerprints(tmp_path):
+    """state.json carries the display summary; fingerprints stay on disk."""
+    import json
+
+    from mcp_servers.keyframe_memory import compact
+
+    memory = {
+        "anchor": "keyframes/shot_001.png",
+        "entries": [
+            {
+                "shot_id": "shot_001",
+                "path": "keyframes/shot_001.png",
+                "score": 0.9,
+                "shot_size": "特写",
+                "fingerprint": {"hist": [0.1] * 48, "thumb": [0.2] * 256},
+                "drift_vs_anchor": None,
+            }
+        ],
+    }
+    small = compact(memory)
+    encoded = json.dumps(small)
+    assert "fingerprint" not in encoded
+    assert small["anchor"] == memory["anchor"]
+    assert small["entries"][0]["shot_size"] == "特写"
+    assert len(encoded) < len(json.dumps(memory)) / 3

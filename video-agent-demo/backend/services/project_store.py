@@ -12,6 +12,11 @@ from agent.settings import PROJECTS_ROOT
 
 _RUN_LOCK = threading.Lock()
 
+# A real run holds the process for minutes, not hours. Ten minutes without a
+# heartbeat means the worker is gone; the longest single paid step we have seen
+# (Seedance 720p, 4s clip) finishes inside two.
+STALE_RUN_SECONDS = 600.0
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -107,22 +112,63 @@ def list_projects(limit: int = 30) -> list[dict[str, Any]]:
     return projects[:limit]
 
 
-def claim_run(project_id: str) -> bool:
-    """Atomically move a project from created/completed into running.
+def claim_run(project_id: str, *, stale_after_s: float = STALE_RUN_SECONDS) -> bool:
+    """Atomically move a project into running, or refuse if a live run holds it.
 
-    Returns False when another run already holds it. The check and the write
-    happen under one lock, so two concurrent /run requests cannot both start.
+    Returns False when another run is genuinely in progress. A run whose
+    heartbeat stopped advancing for ``stale_after_s`` is treated as dead: its
+    worker was killed, the machine restarted, or the process was interrupted.
+    Without that check a crashed run leaves the project pinned to "running"
+    forever, since nothing else ever clears the flag.
+
+    The check, the reclaim and the write all happen under one lock, so two
+    concurrent /run requests cannot both start.
     """
     root = project_dir(project_id)
     if not root.exists():
         raise FileNotFoundError(project_id)
     with _RUN_LOCK:
         state = load_state(project_id)
-        if state.get("status") == "running":
+        if state.get("status") == "running" and not is_run_stale(state, stale_after_s):
             return False
+        now = now_iso()
         state["status"] = "running"
+        state["run_started_at"] = now
+        state["run_heartbeat_at"] = now
+        state.pop("error", None)
         save_state(project_id, state)
         return True
+
+
+def is_run_stale(state: dict[str, Any], stale_after_s: float = STALE_RUN_SECONDS) -> bool:
+    """True when a "running" project has stopped showing signs of life."""
+    if state.get("status") != "running":
+        return False
+    last = state.get("run_heartbeat_at") or state.get("run_started_at")
+    if not last:
+        # Running with no heartbeat at all: written by an older version whose
+        # worker is long gone. Reclaimable rather than permanently pinned.
+        return True
+    try:
+        seen = datetime.fromisoformat(last)
+    except ValueError:
+        return True
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - seen).total_seconds() > stale_after_s
+
+
+def heartbeat(project_id: str) -> None:
+    """Signal that the worker is alive; called between graph nodes."""
+    path = project_dir(project_id) / "state.json"
+    if not path.exists():
+        return
+    with _RUN_LOCK:
+        state = read_json(path)
+        if state.get("status") != "running":
+            return
+        state["run_heartbeat_at"] = now_iso()
+        write_json(path, state)
 
 
 def get_project(project_id: str) -> dict[str, Any]:

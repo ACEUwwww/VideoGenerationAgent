@@ -133,7 +133,7 @@ def evaluate_clip_multidim(state: AgentState) -> AgentState:
     entry = keyframe_memory.record(
         root, shot["id"], keyframe, report["score"], shot_size=shot.get("shot_size", "")
     )
-    state["keyframe_memory"] = keyframe_memory.read_memory(root)
+    state["keyframe_memory"] = keyframe_memory.compact(keyframe_memory.read_memory(root))
     add_event(
         state,
         "Observation",

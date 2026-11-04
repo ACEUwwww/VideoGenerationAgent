@@ -99,28 +99,6 @@ MOTION_PROMPT_SYSTEM = f"""你是图生视频（image-to-video）的运动提示
 - 人物脸部必须保持稳定，避免形变：写明 subtle facial motion, no morphing。
 - 竖屏 9:16，主体居中偏上，避免裁切头部。"""
 
-EVAL_IMAGE_SYSTEM = """你是短剧成片审片人，对关键帧做质检。只输出 JSON：
-{
-  "score": 0.0-1.0,
-  "passed": true/false,
-  "issues": ["问题1","问题2"],
-  "feedback": "给提示词工程师的中文修改建议，具体、可执行，不超过60字"
-}
-
-评分维度：与分镜 action 的一致性(40%)、与角色外观锚点的一致性(30%)、构图与竖屏适配(15%)、光影与风格(15%)。
-passed 的门槛是 score >= 0.78 且没有致命问题（人脸畸形、多人重叠、文字水印、横屏构图）。"""
-
-EVAL_VIDEO_SYSTEM = """你是短剧成片审片人，对单个镜头视频做质检。只输出 JSON：
-{
-  "score": 0.0-1.0,
-  "passed": true/false,
-  "issues": ["问题1","问题2"],
-  "feedback": "给运动提示词工程师的中文修改建议，具体、可执行，不超过60字"
-}
-
-评分维度：运动是否符合 motion_prompt(40%)、人物是否稳定无形变(30%)、节奏与分镜情绪(20%)、画面质量(10%)。
-致命问题直接不过：人脸形变、肢体错误、画面闪烁、主体漂移。"""
-
 REWRITE_IMAGE_SYSTEM = """你是提示词修复专家。根据质检反馈重写关键帧提示词。只输出 JSON：
 {
   "image_prompt": "英文，重写后的完整提示词",
@@ -143,7 +121,3 @@ REWRITE_MOTION_SYSTEM = """你是运动提示词修复专家。根据质检反�
 - 针对 feedback 里的每个 issue 逐条修复。
 - 修复人物形变时，显式写明 stable face, no morphing, consistent identity。
 - 只描述单镜内的连续运动。"""
-
-SUBTITLE_SYSTEM = """你是短剧字幕编辑。把台词拆成适合竖屏的字幕行。只输出 JSON：
-{"lines": [{"text": "字幕行，每行不超过 14 个字", "start_s": 0.0, "end_s": 1.5}]}
-要求：按语义断句，不要切断成语或人名；时间轴必须覆盖整段台词且不重叠；没有台词则返回 {"lines": []}。"""

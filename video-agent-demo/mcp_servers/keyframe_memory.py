@@ -81,6 +81,26 @@ def record(
     return entry
 
 
+def compact(memory: dict) -> dict:
+    """Memory without the per-keyframe fingerprints, for the project state.
+
+    The fingerprints are 256-float vectors per shot — at 12 shots they were 55%
+    of state.json, which every node rewrites in full. They stay in memory.json
+    where the drift maths needs them; state carries only what the UI shows.
+    """
+    entries = [
+        {
+            "shot_id": entry.get("shot_id", ""),
+            "path": entry.get("path", ""),
+            "score": entry.get("score", 0.0),
+            "shot_size": entry.get("shot_size", ""),
+            "drift_vs_anchor": entry.get("drift_vs_anchor"),
+        }
+        for entry in memory.get("entries", [])
+    ]
+    return {"anchor": memory.get("anchor", ""), "entries": entries}
+
+
 def anchor_entry(project_root: Path) -> dict | None:
     memory = read_memory(project_root)
     return next((e for e in memory["entries"] if e["path"] == memory["anchor"]), None)

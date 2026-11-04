@@ -168,7 +168,7 @@ workspace/projects/<project_id>/
 .venv/bin/python -m pytest tests -q
 ```
 
-28 项测试，覆盖：
+36 项测试，覆盖：
 
 - 全链路产出真实 mp4（分辨率/编码/时长断言）、字幕时间轴与烧录
 - 关键帧记忆锚点与漂移、回灌参考图的传递
@@ -230,6 +230,23 @@ workspace/projects/<project_id>/
 - **`ARK_VIDEO_RESOLUTION` 配置未生效**：`MediaSettings` 构造时漏传该字段，
   永远走默认 `720p`。已接上，实测 `.env` 与环境变量覆盖均正确。
 
+第四轮（2026-11-04）修复的三项：
+
+- **崩溃或重启后项目永久卡死**：`claim_run()` 以前只看 `status == "running"`
+  就拒绝，没有任何超时判断。实测把状态置成 `running` 模拟进程被杀后，重试
+  永远返回 `False`，只能手工改 JSON 才能恢复。现在运行时会周期性写
+  `run_heartbeat_at`（45 秒一次的心跳线程 + 节点边界），超过
+  `STALE_RUN_SECONDS`（600 秒）没有心跳就判定为僵尸并允许重新认领；旧版本
+  留下的、完全没有心跳字段的 `running` 状态也可直接认领。
+- **`state.json` 随镜头线性膨胀**：`keyframe_memory` 里每个关键帧带一个
+  256 维指纹向量，3 镜时占 state 的 55%。现在指纹只存 `keyframes/memory.json`，
+  state 里保留 `compact()` 后的展示摘要（锚点路径、分数、景别、漂移量）。
+  3 镜实测 38KB → 16.7KB，`keyframe_memory` 字段从 21KB 降到 496 字节。
+- **三个从未被引用的提示词模板**：`SUBTITLE_SYSTEM`、`EVAL_IMAGE_SYSTEM`、
+  `EVAL_VIDEO_SYSTEM` 定义在 `agent/prompts.py` 里但零处引用——质检实际走的是
+  `evaluators.py` 的像素测量，字幕切分是 `split_subtitle()` 的代码逻辑。
+  已删除，避免后来者误以为这些能力已由 LLM 实现。
+
 仍然存在：
 
 - ~~TTS 仍是静音轨~~ **已解决（2026-10-30 第三轮）**：Seed-Audio 1.0 已接入。
@@ -242,8 +259,9 @@ workspace/projects/<project_id>/
   在 0.85-1.45 倍速内做时间伸缩（保持自然语速），超出则补静音或截断。
 - **没有视觉模型**。当前质检是像素测量 + 文件事实，能抓住崩溃、横屏、
   闪烁、漂移，但抓不住「脸画歪了」这类语义问题。MLLM 钩子已预留。
-- **单进程后台任务**。`BackgroundTasks` + `asyncio.to_thread`，无取消、
-  无重启恢复；状态停在 `running` 时只能手工改 JSON。
+- **单进程后台任务**。`BackgroundTasks` + `asyncio.to_thread`，无任务队列、
+  无主动取消。僵死运行现在能被心跳超时自动回收，但正在跑的生成任务本身
+  仍然无法中断（Seedance 单次渲染 60-90 秒，只能等它返回）。
 - **关键帧回灌已实现（图像侧），视频侧受模型限制**。
   Seedream 4.0 接受 `image` 参数做参考图条件，首镜关键帧现在会作为锚点传给
   第二镜及之后的所有镜头（`IMAGE_REFERENCE=1`，默认开启）。实测同一部两镜短剧：
