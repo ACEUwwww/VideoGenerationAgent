@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +36,17 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/health/connectivity")
+def connectivity(request: Request) -> dict:
+    """Non-billing reachability report: server socket, outbound vendors, and
+    an explicit statement that inbound reachability cannot be tested here."""
+    from backend.connectivity import connectivity_report
+
+    port = request.url.port or int(os.environ.get("PORT", "8000"))
+    return connectivity_report(port)
+
 
 
 @app.get("/api/config")
