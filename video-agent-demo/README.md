@@ -86,6 +86,30 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 
 两套脚本只是入口，实际逻辑在 `scripts/doctor.py` 与 `scripts/simulate.py`，Python 代码跨平台共用。
 
+### 连通性自检
+
+服务起来后，`GET /api/health/connectivity` 给出一份零计费的三层报告：
+
+```bash
+curl -s http://127.0.0.1:31113/api/health/connectivity | python -m json.tool
+```
+
+| 层 | 内容 |
+|---|---|
+| `server` | 从 `/proc/net/tcp` 读到的实际监听地址，再对 `127.0.0.1` 做一次真实 socket connect |
+| `outbound` | 并发对 DeepSeek / 方舟 / 豆包语音各发一次不鉴权 GET，区分「网络不通」与「通了但凭据被拒」 |
+| `inbound` | 明确写明外部可达性无法从容器内验证，并给出客户端侧命令 |
+
+`/health` 只说明进程还在；这个接口才回答「真的能接受连接、上游也通」。
+它不触发任何生成调用，可以随便跑。
+
+`outbound` 里各服务的判读：
+
+- `status 200` + `credential accepted` —— 网络与 key 都正常
+- `status 401/403` —— 网络通，key 没配或无效
+- `status 405` —— 豆包语音的 TTS 端点只接受 POST，405 本身就是「主机可达」的证据
+- `reachable: false` —— DNS、TLS 或出网被阻断，`detail` 里是具体异常
+
 ## 3. Pipeline
 
 ```
