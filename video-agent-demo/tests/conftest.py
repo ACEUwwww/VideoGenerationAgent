@@ -44,9 +44,9 @@ class FakeLLMClient:
         user = messages[-1]["content"]
         self.calls.append(system[:20])
 
-        if "短剧策划" in system:
+        if "短片编剧" in system:
             payload = BIBLE
-        elif "分镜师" in system:
+        elif "短片分镜师" in system:
             count = 2
             for token in user.split():
                 if token.startswith("镜头数量"):

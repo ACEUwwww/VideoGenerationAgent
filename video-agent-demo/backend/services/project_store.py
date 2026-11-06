@@ -40,6 +40,7 @@ def create_project(
     *,
     script: str = "",
     genre: str = "",
+    target_seconds: int = 0,
 ) -> dict[str, Any]:
     project_id = f"project_{uuid.uuid4().hex[:8]}"
     root = ensure_project_dirs(project_id)
@@ -51,6 +52,7 @@ def create_project(
         "genre": genre,
         "style": style,
         "shot_count": shot_count,
+        "target_seconds": target_seconds,
         "created_at": now_iso(),
         "updated_at": now_iso(),
     }
@@ -68,6 +70,8 @@ def initial_state(project: dict[str, Any]) -> dict[str, Any]:
         "genre": project.get("genre", ""),
         "style": project["style"],
         "shot_count": project["shot_count"],
+        "target_seconds": project.get("target_seconds", 0),
+        "beats": [],
         "status": project["status"],
         "logline": "",
         "tone": "",

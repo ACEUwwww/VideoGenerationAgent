@@ -9,6 +9,7 @@ class ProjectCreate(BaseModel):
     genre: str = ""
     style: str = "电影感竖屏短剧"
     shot_count: int = Field(default=4, ge=1, le=12)
+    target_seconds: int = Field(default=0, ge=0, le=300)
 
 
 class ProjectResponse(BaseModel):

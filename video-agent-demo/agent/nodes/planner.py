@@ -41,6 +41,13 @@ def plan_story(state: AgentState) -> AgentState:
     track_usage(state, "plan_bible", reply)
 
     characters = data.get("characters") or []
+    beats = data.get("beats") or []
+    if beats and len(beats) != state["shot_count"]:
+        add_event(
+            state,
+            "Observation",
+            f"设定集给了 {len(beats)} 个节拍，与 {state['shot_count']} 镜不符，按镜头数标注。",
+        )
     for position, character in enumerate(characters, start=1):
         character.setdefault("id", f"c{position}")
     state["logline"] = data.get("logline", "")
@@ -50,6 +57,7 @@ def plan_story(state: AgentState) -> AgentState:
     state["outline"] = data.get("outline", "")
     state["hook"] = data.get("hook", "")
     state["ending"] = data.get("ending", "")
+    state["beats"] = data.get("beats") or []
     state["characters"] = characters
     project_store.save_bible(state["project_id"], {"characters": characters, **data})
 
@@ -144,6 +152,13 @@ def _bible_request(state: AgentState) -> str:
     if state.get("script"):
         parts.append(f"用户提供的剧本/素材：\n{state['script']}")
     parts.append(f"镜头数量：{state['shot_count']}（请让梗概适配这个长度）")
+    target = state.get("target_seconds") or 0
+    if target:
+        parts.append(
+            f"目标总时长：约 {target} 秒。{state['shot_count']} 个镜头，"
+            f"平均每镜约 {target / max(state['shot_count'], 1):.1f} 秒，"
+            f"beats 的数量仍必须等于镜头数。"
+        )
     return "\n".join(parts)
 
 
@@ -158,8 +173,18 @@ def _shots_request(state: AgentState) -> str:
         "ending": state.get("ending", ""),
         "characters": state.get("characters", []),
     }
-    return (
-        f"镜头数量：{state['shot_count']}\n"
-        f"风格：{state['style']}\n"
-        f"设定集：\n{json.dumps(bible, ensure_ascii=False, indent=2)}"
-    )
+    parts = [f"镜头数量：{state['shot_count']}", f"风格：{state['style']}"]
+    target = state.get("target_seconds") or 0
+    if target:
+        parts.append(
+            f"目标总时长：约 {target} 秒（所有镜头的 duration_s 相加必须落在 "
+            f"{max(target - 2, 1)}–{target + 2} 秒之间）"
+        )
+    beats = state.get("beats") or []
+    if beats:
+        parts.append(
+            "故事节拍（第 N 镜必须对应第 N 个节拍，顺序不得调换）：\n"
+            + "\n".join(f"  {i}. {b}" for i, b in enumerate(beats, start=1))
+        )
+    parts.append(f"设定集：\n{json.dumps(bible, ensure_ascii=False, indent=2)}")
+    return "\n".join(parts)

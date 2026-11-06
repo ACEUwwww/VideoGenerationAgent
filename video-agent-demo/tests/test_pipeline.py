@@ -131,7 +131,7 @@ def test_shot_count_is_respected(project_root, fake_llm, count):
     assert len(final["shots"]) == count
 
 
-def test_transitions_overlap_shortens_the_timeline(project_root, monkeypatch):
+def test_transitions_overlap_shortens_the_timeline(project_root, fake_llm, monkeypatch):
     """A storyboard transition is real time, not a label: an overlapping
     transition must shorten the encoded episode by its overlap."""
     import agent.settings as settings_mod
@@ -158,7 +158,7 @@ def test_transitions_overlap_shortens_the_timeline(project_root, monkeypatch):
     assert abs(facts["duration_s"] - meta["duration_s"]) < 0.35
 
 
-def test_subtitles_shift_with_the_title_card(project_root):
+def test_subtitles_shift_with_the_title_card(project_root, fake_llm):
     """Subtitle times are re-based onto the encoded timeline; a prepended card
     must not leave dialogue sitting before its shot."""
     state = project_store.load_state(project_store.create_project("字幕位移", "电影感", 2)["project_id"])
@@ -171,7 +171,7 @@ def test_subtitles_shift_with_the_title_card(project_root):
         assert line.split(",")[1] != "0:00:00.00"
 
 
-def test_bgm_is_mixed_and_preserves_length(project_root, monkeypatch):
+def test_bgm_is_mixed_and_preserves_length(project_root, fake_llm, monkeypatch):
     """A looping BGM bed must not truncate the episode: -shortest used to cut
     the video to the BGM's own length."""
     import agent.settings as settings_mod

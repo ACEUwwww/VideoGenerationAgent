@@ -19,6 +19,9 @@ class AgentState(TypedDict, total=False):
     style: str
     genre: str
     shot_count: int
+    # Requested episode length. LangGraph only carries keys declared here, so an
+    # undeclared field is silently dropped at the first node boundary.
+    target_seconds: int
     status: str
     error: str
 
@@ -28,6 +31,8 @@ class AgentState(TypedDict, total=False):
     outline: str
     hook: str
     ending: str
+    # One entry per shot, produced by plan_story and consumed by plan_shots.
+    beats: list[str]
     characters: list[dict[str, Any]]
 
     shots: list[dict[str, Any]]
