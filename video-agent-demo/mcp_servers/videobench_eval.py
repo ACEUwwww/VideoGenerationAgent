@@ -31,15 +31,34 @@ DIMENSIONS: dict[str, tuple[float, str]] = {
 PASS_SCORE = 0.62
 
 
-def dimension_prompt(dimension: str, shot: dict) -> str:
-    """The MLLM judging prompt for one dimension, in Video-Bench's spirit."""
-    _, description = DIMENSIONS[dimension]
-    return (
-        f"你是竖屏短剧成片的视觉审片人。评估维度：{description}。\n"
-        f"分镜要求：{json.dumps(shot, ensure_ascii=False)}\n"
-        "请按 1-5 分打分（5 最好），并用 because 说明理由。只输出 JSON："
-        '{"score": 4, "because": "..."}'
-    )
+MLLM_DIMENSIONS = ("imaging_quality", "aesthetic_quality", "motion_effects", "object_consistency")
+
+
+def dimension_prompt(dimensions: tuple[str, ...], shot: dict) -> str:
+    """One judging prompt covering every MLLM dimension in a single call.
+
+    Scoring each dimension separately costs an image upload each time; the
+    vision model sees the same frame regardless, so one call returning all
+    dimensions is both cheaper and more coherent.
+    """
+    lines = [
+        "你是竖屏短剧成片的视觉审片人。请逐项评估这张关键帧，按 1-5 分打分（5 最好）。",
+        "",
+        "评估维度：",
+    ]
+    for name in dimensions:
+        _, description = DIMENSIONS[name]
+        lines.append(f"- {name}: {description}")
+    lines += [
+        "",
+        f"分镜要求：{json.dumps(shot, ensure_ascii=False)}",
+        "",
+        "重点检查：人物面部是否变形、五官是否错位、肢体是否畸形、文字是否乱码。",
+        "只输出 JSON，每个维度一个 1-5 的整数分数，另给一句理由：",
+        '{"imaging_quality": 4, "aesthetic_quality": 4, "motion_effects": 4, '
+        '"object_consistency": 4, "reason": "..."}',
+    ]
+    return "\n".join(lines)
 
 
 # Shot sizes whose whole-frame layout is far enough apart that a structural
@@ -68,14 +87,18 @@ def evaluate_clip(
     reference_frame: np.ndarray | None = None,
     reference_shot_size: str = "",
     mllm_judge=None,
+    keyframe_path: Path | None = None,
     frame_count: int = 8,
 ) -> dict:
     """Score one clip across every dimension.
 
-    ``mllm_judge(prompt) -> (score_1_to_5, reason)`` is optional. When it is
-    present the judge's score replaces the local estimate for the pragmatic
-    dimensions (imaging, aesthetic, motion) and is recorded alongside it, so a
-    run with a vision model never silently loses the measured value.
+    ``mllm_judge(image_path, prompt) -> (scores_dict, reason)`` is optional.
+    It receives the full-resolution keyframe, not the 192px thumbnails used for
+    pixel measurement: at that size a vision model cannot see a deformed face,
+    which is exactly what it is there to catch. The judge covers every
+    dimension in one call and its 1-5 scores are max-merged with the measured
+    estimate, so a run with a vision model never silently loses the measured
+    value.
     """
     frames = extract_frames(Path(video_path), frame_count)
     if not frames:
@@ -92,6 +115,21 @@ def evaluate_clip(
     )
     local = score_dimensions(raw, reference)
 
+    judged: dict[str, int] = {}
+    judge_reason = ""
+    judge_error = ""
+    if mllm_judge and keyframe_path is not None:
+        scores, reason = mllm_judge(keyframe_path, dimension_prompt(MLLM_DIMENSIONS, shot))
+        for name, value in (scores or {}).items():
+            if name in MLLM_DIMENSIONS:
+                try:
+                    judged[name] = int(value)
+                except (TypeError, ValueError):
+                    continue
+        judge_reason = reason or ""
+        if not judged:
+            judge_error = reason or "vision judge returned no usable scores"
+
     dimensions: dict[str, dict] = {}
     for name, (weight, description) in DIMENSIONS.items():
         entry = dict(local.get(name, {"score": 0.0, "detail": {}}))
@@ -99,10 +137,10 @@ def evaluate_clip(
         entry["description"] = description
         if name in ("temporal_consistency", "color_consistency", "scene_consistency", "object_consistency"):
             entry["measured"] = True
-        if mllm_judge and name in ("imaging_quality", "aesthetic_quality", "motion_effects"):
-            score, reason = mllm_judge(dimension_prompt(name, shot))
+        if name in judged:
+            score = judged[name]
             entry["mllm_score_1to5"] = score
-            entry["mllm_reason"] = reason
+            entry["mllm_reason"] = judge_reason
             entry["score"] = round(max(entry["score"], (score - 1) / 4), 3)
         dimensions[name] = entry
 

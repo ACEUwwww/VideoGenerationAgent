@@ -55,6 +55,7 @@ class MediaSettings:
     ark_api_key: str = ""
     ark_image_model: str = ""
     ark_video_model: str = ""
+    ark_vision_model: str = ""
     ark_video_resolution: str = "720p"
     image_reference: bool = True
     image_retries: int = 1
@@ -62,6 +63,10 @@ class MediaSettings:
     width: int = 1080
     height: int = 1920
     fps: int = 30
+    transitions: bool = True
+    title_card: bool = True
+    bgm_path: str = ""
+    bgm_volume: float = 0.18
     @property
     def aspect(self) -> str:
         return f"{self.width}:{self.height}"
@@ -109,6 +114,7 @@ def load_settings() -> Settings:
         ark_api_key=_env("ARK_API_KEY"),
         ark_image_model=_env("ARK_IMAGE_MODEL", "doubao-seedream-4-0-250828"),
         ark_video_model=_env("ARK_VIDEO_MODEL", "doubao-seedance-1-0-pro-fast-251015"),
+        ark_vision_model=_env("ARK_VISION_MODEL", "doubao-seed-2-1-pro-260915"),
         ark_video_resolution=_env("ARK_VIDEO_RESOLUTION", "720p"),
         image_reference=_env("IMAGE_REFERENCE", "1") not in ("0", "false", "False"),
         image_retries=int(_env("IMAGE_RETRIES", "1")),
@@ -116,6 +122,10 @@ def load_settings() -> Settings:
         width=int(_env("VIDEO_WIDTH", "1080")),
         height=int(_env("VIDEO_HEIGHT", "1920")),
         fps=int(_env("VIDEO_FPS", "30")),
+        transitions=_env("VIDEO_TRANSITIONS", "1") not in ("0", "false", "False"),
+        title_card=_env("VIDEO_TITLE_CARD", "1") not in ("0", "false", "False"),
+        bgm_path=_env("BGM_PATH", ""),
+        bgm_volume=float(_env("BGM_VOLUME", "0.18")),
     )
     return Settings(llm=llm, media=media)
 

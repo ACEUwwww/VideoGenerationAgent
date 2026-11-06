@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx
 
+from agent.llm_client import parse_json
 from agent.settings import get_settings
 from mcp_servers.providers.base import ImageRequest, VideoRequest
 
@@ -60,7 +61,11 @@ def _credentials(kind: str) -> tuple[str, str, str]:
     api_key = media.ark_api_key
     if not api_key:
         raise RuntimeError("ARK_API_KEY is empty")
-    model = media.ark_image_model if kind == "image" else media.ark_video_model
+    model = {
+        "image": media.ark_image_model,
+        "video": media.ark_video_model,
+        "vision": media.ark_vision_model,
+    }[kind]
     if not model:
         raise RuntimeError(f"ARK_{kind.upper()}_MODEL is empty")
     return base_url, api_key, model
@@ -184,6 +189,51 @@ class ArkVideoProvider:
             "resolution": body.get("resolution", ""),
             "usage": usage,
         }
+
+
+class ArkVisionJudge:
+    """Chat-completions call against a vision model for QA judgement.
+
+    The keyframe goes in as a data URI at full resolution: the pixel-based
+    evaluator works on 192px thumbnails, which is far too small for a model to
+    spot a deformed face. Returns 1-5 scores keyed by dimension plus a reason.
+    """
+
+    name = "ark"
+
+    def judge(self, image_path: Path, prompt: str) -> tuple[dict[str, int], str]:
+        base_url, api_key, model = _credentials("vision")
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": _data_uri(Path(image_path)), "detail": "high"},
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+            "max_tokens": 600,
+            "temperature": 0.2,
+        }
+        body = _post_with_retry(
+            f"{base_url}/chat/completions",
+            {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            payload,
+            timeout=120,
+        )
+        text = body["choices"][0]["message"]["content"]
+        data = parse_json(text)
+        scores = {
+            key: data[key]
+            for key in ("imaging_quality", "aesthetic_quality", "motion_effects", "object_consistency")
+            if key in data
+        }
+        return scores, str(data.get("reason", ""))[:400]
 
 
 def _data_uri(path: Path) -> str:

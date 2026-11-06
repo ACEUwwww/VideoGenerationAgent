@@ -7,6 +7,7 @@ vendor must either use it or fail loudly.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from agent.settings import get_settings
@@ -18,7 +19,7 @@ from mcp_servers.providers.base import (
     VideoProvider,
     VideoRequest,
 )
-from mcp_servers.providers.ark_media import ArkImageProvider, ArkVideoProvider
+from mcp_servers.providers.ark_media import ArkImageProvider, ArkVideoProvider, ArkVisionJudge
 from mcp_servers.providers.doubao_speech import DoubaoSpeechProvider
 from mcp_servers.providers.mock_media import (
     MockImageProvider,
@@ -70,12 +71,27 @@ def get_speech_provider() -> SpeechProvider:
     )
 
 
+def get_vision_judge():
+    """Vision QA judge, or None when no vision model is configured.
+
+    Returning None keeps the measured-only path intact: a run without a vision
+    model scores exactly as before rather than failing.
+    """
+    media = get_settings().media
+    if not media.ark_vision_model or not media.ark_api_key:
+        return None
+    if os.environ.get("ARK_ALLOW_PAID") != "1":
+        return None
+    return ArkVisionJudge()
+
+
 def provider_report() -> dict[str, str]:
     media = get_settings().media
     return {
         "image": get_image_provider().name,
         "video": get_video_provider().name,
         "tts": get_speech_provider().name,
+        "vision": "ark" if get_vision_judge() else "none",
         "canvas": f"{media.width}x{media.height}@{media.fps}",
     }
 
@@ -91,5 +107,6 @@ __all__ = [
     "get_image_provider",
     "get_speech_provider",
     "get_video_provider",
+    "get_vision_judge",
     "provider_report",
 ]

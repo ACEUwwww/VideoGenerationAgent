@@ -9,34 +9,34 @@ from mcp_servers.videobench_eval import evaluate_episode
 
 def compose_video(state: AgentState) -> AgentState:
     shots = state.get("shots", [])
+    # Subtitle times stay relative to each shot; compose_video re-bases them
+    # onto the encoded timeline, which shifts once transitions overlap and a
+    # title card is prepended.
     clips = [
-        {"video_path": shot["video_path"], "audio_path": shot.get("audio_path", ""), "duration_s": shot["duration_s"]}
+        {
+            "video_path": shot["video_path"],
+            "audio_path": shot.get("audio_path", ""),
+            "duration_s": shot["duration_s"],
+            "transition": shot.get("transition", ""),
+            "subtitle_lines": shot.get("subtitle_lines") or [],
+        }
         for shot in shots
         if shot.get("video_path")
     ]
     if not clips:
         raise ValueError("no generated clips to compose")
 
-    subtitle_lines: list[dict] = []
-    cursor = 0.0
-    for shot in shots:
-        for line in shot.get("subtitle_lines") or []:
-            subtitle_lines.append(
-                {
-                    "text": line["text"],
-                    "start_s": round(cursor + float(line["start_s"]), 2),
-                    "end_s": round(cursor + float(line["end_s"]), 2),
-                }
-            )
-        cursor += float(shot["duration_s"])
+    subtitle_count = sum(len(shot.get("subtitle_lines") or []) for shot in shots)
+    planned_duration = sum(float(shot["duration_s"]) for shot in shots)
 
     add_event(
         state,
         "Action",
         "MCP.compose_video",
-        {"clips": len(clips), "subtitle_lines": len(subtitle_lines), "duration_s": round(cursor, 2)},
+        {"clips": len(clips), "subtitle_lines": subtitle_count, "duration_s": round(planned_duration, 2),
+         "transitions": [clip["transition"] for clip in clips if clip["transition"]]},
     )
-    result = tools.compose_video(clips, state["project_id"], title=state.get("logline", ""), subtitle_lines=subtitle_lines)
+    result = tools.compose_video(clips, state["project_id"], title=state.get("logline", ""))
     state["final_video_path"] = result["final_video_path"]
     state["subtitle_path"] = result.get("subtitle_path", "")
 

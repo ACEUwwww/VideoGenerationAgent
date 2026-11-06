@@ -129,3 +129,123 @@ def test_shot_count_is_respected(project_root, fake_llm, count):
     state = project_store.load_state(created["project_id"])
     final = run_agent(state)
     assert len(final["shots"]) == count
+
+
+def test_transitions_overlap_shortens_the_timeline(project_root, monkeypatch):
+    """A storyboard transition is real time, not a label: an overlapping
+    transition must shorten the encoded episode by its overlap."""
+    import agent.settings as settings_mod
+
+    settings_mod.reset_settings()
+    state = project_store.load_state(project_store.create_project("转场", "电影感", 2)["project_id"])
+    state["status"] = "running"
+    final = run_agent(state)
+
+    shots = final["shots"]
+    meta = json.loads((project_root / state["project_id"] / "final" / "final_video.json").read_text(encoding="utf-8"))
+    planned = sum(float(shot["duration_s"]) for shot in shots)
+    # Title card adds, each non-hard-cut boundary subtracts its overlap.
+    overlaps = {"fade": 0.40, "fadewhite": 0.25, "fadeblack": 0.30}
+    applied = [t["applied"] for t in meta["transitions"]]
+    # The title card cross-fades into the first shot, which is one more overlap.
+    if meta.get("title_card_transition"):
+        applied.append(meta["title_card_transition"])
+    total_overlap = sum(overlaps.get(kind, 0.0) for kind in applied)
+    card = 1.2 if meta["title_card"] else 0.0
+    expected = planned + card - total_overlap
+    assert abs(meta["duration_s"] - expected) < 0.35
+    facts = media_facts(project_root / state["project_id"] / final["final_video_path"])
+    assert abs(facts["duration_s"] - meta["duration_s"]) < 0.35
+
+
+def test_subtitles_shift_with_the_title_card(project_root):
+    """Subtitle times are re-based onto the encoded timeline; a prepended card
+    must not leave dialogue sitting before its shot."""
+    state = project_store.load_state(project_store.create_project("字幕位移", "电影感", 2)["project_id"])
+    state["status"] = "running"
+    final = run_agent(state)
+    body = (project_root / state["project_id"] / final["subtitle_path"]).read_text(encoding="utf-8")
+    dialogue = [line for line in body.splitlines() if line.startswith("Dialogue:")]
+    assert dialogue
+    for line in dialogue:
+        assert line.split(",")[1] != "0:00:00.00"
+
+
+def test_bgm_is_mixed_and_preserves_length(project_root, monkeypatch):
+    """A looping BGM bed must not truncate the episode: -shortest used to cut
+    the video to the BGM's own length."""
+    import agent.settings as settings_mod
+    import mcp_servers.video_tools_server as tools
+
+    state = project_store.load_state(project_store.create_project("配乐", "电影感", 1)["project_id"])
+    state["status"] = "running"
+    final = run_agent(state)
+
+    root = project_root / state["project_id"]
+    bgm = root / "audio" / "bgm.m4a"
+    tools.run([tools.ffmpeg_bin(), "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "aac", str(bgm)])
+
+    clips = [
+        {
+            "video_path": final["shots"][0]["video_path"],
+            "audio_path": final["shots"][0].get("audio_path", ""),
+            "duration_s": final["shots"][0]["duration_s"],
+            "transition": "硬切",
+            "subtitle_lines": final["shots"][0].get("subtitle_lines") or [],
+        }
+    ]
+    with_bgm = tools.compose_video(clips, state["project_id"], title="片名", bgm_path="audio/bgm.m4a")
+    without = tools.compose_video(clips, state["project_id"], title="片名")
+
+    mixed = media_facts(root / with_bgm["final_video_path"])
+    plain = media_facts(root / without["final_video_path"])
+    assert mixed["has_audio"] and plain["has_audio"]
+    assert abs(mixed["duration_s"] - plain["duration_s"]) < 0.35
+
+
+def test_vision_judge_covers_all_dimensions_in_one_call(tmp_path):
+    """One keyframe upload must score every MLLM dimension: calling per
+    dimension re-uploads the same image and triples the token cost."""
+    from mcp_servers.videobench_eval import MLLM_DIMENSIONS, evaluate_clip
+
+    clip = tmp_path / "clip.mp4"
+    keyframe = tmp_path / "keyframe.png"
+    subprocess_ffmpeg = [
+        "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0x334455:s=540x960:d=2:r=30",
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(clip),
+    ]
+    import subprocess as sp
+
+    sp.run(subprocess_ffmpeg, capture_output=True, check=True)
+    sp.run(["ffmpeg", "-y", "-i", str(clip), "-frames:v", "1", str(keyframe)], capture_output=True, check=True)
+
+    calls: list[str] = []
+
+    def judge(image_path, prompt):
+        calls.append(str(image_path))
+        return {"imaging_quality": 5, "aesthetic_quality": 4, "motion_effects": 3, "object_consistency": 2}, "脸部轻微变形"
+
+    report = evaluate_clip(clip, shot={"shot_size": "特写"}, keyframe_path=keyframe, mllm_judge=judge)
+
+    assert len(calls) == 1, f"expected one vision call, got {len(calls)}"
+    assert calls[0] == str(keyframe), "judge must receive the full-resolution keyframe"
+    for name in MLLM_DIMENSIONS:
+        entry = report["dimensions"][name]
+        assert entry.get("mllm_score_1to5") is not None, f"{name} missing judge score"
+        assert entry["mllm_reason"] == "脸部轻微变形"
+    # 2/5 maps to 0.25 and is max-merged with the measured estimate, so the
+    # recorded score never falls below the judge's own floor.
+    subject = report["dimensions"]["object_consistency"]
+    assert subject["score"] >= 0.25 - 1e-9
+
+
+def test_vision_judge_is_absent_without_paid_gate(monkeypatch):
+    """No key or no ARK_ALLOW_PAID means no judge, and the measured path stays."""
+    from mcp_servers.providers import get_vision_judge
+
+    monkeypatch.delenv("ARK_ALLOW_PAID", raising=False)
+    monkeypatch.setenv("ARK_API_KEY", "test-key")
+    import agent.settings as settings_mod
+
+    settings_mod.reset_settings()
+    assert get_vision_judge() is None

@@ -177,6 +177,82 @@ def fit_audio(audio_path: str, project_id: str, shot_id: str, *, target_duration
 # --------------------------------------------------------------------------- #
 # Composition
 # --------------------------------------------------------------------------- #
+# Storyboards author transitions as labels. Each label maps to an ffmpeg xfade
+# transition plus the overlap it needs; the overlap is real time, so the
+# subtitles and the audio bed are shifted by the same amounts.
+TRANSITIONS: dict[str, tuple[str | None, float]] = {
+    "叠化": ("fade", 0.40),
+    "dissolve": ("fade", 0.40),
+    "淡入": ("fade", 0.40),
+    "闪白": ("fadewhite", 0.25),
+    "推黑": ("fadeblack", 0.30),
+    "淡出": ("fadeblack", 0.30),
+    "硬切": (None, 0.0),
+    "cut": (None, 0.0),
+}
+TITLE_CARD_SECONDS = 1.2
+TITLE_CARD_TRANSITION = ("fade", 0.40)
+
+
+def _transition_for(name: str | None, enabled: bool) -> tuple[str | None, float]:
+    """Map a storyboard transition label onto (xfade name, overlap seconds)."""
+    if not enabled or not name:
+        return None, 0.0
+    for label, spec in TRANSITIONS.items():
+        if label in str(name):
+            return spec
+    return None, 0.0
+
+
+def _make_title_card(root: Path, media, title: str, subtitle: str) -> Path:
+    """A short 9:16 card carrying the episode title over a silent audio bed."""
+    target = root / "videos" / "_title_card.mp4"
+    font = _escape_filter_path(font_path())
+    filters = (
+        f"drawtext=fontfile='{font}':text='{_escape_drawtext(title)[:20]}':fontcolor=white"
+        f":fontsize={int(media.width * 0.11)}:x=(w-text_w)/2:y=(h-text_h)/2"
+        f":borderw=6:bordercolor=black@0.85"
+    )
+    if subtitle:
+        filters += (
+            f",drawtext=fontfile='{font}':text='{_escape_drawtext(subtitle)[:26]}'"
+            f":fontcolor=white@0.82:fontsize={int(media.width * 0.05)}"
+            f":x=(w-text_w)/2:y=(h-text_h)/2+{int(media.width * 0.13)}"
+        )
+    run([
+        ffmpeg_bin(), "-y",
+        "-f", "lavfi",
+        "-i", f"color=c=0x0b0d18:s={media.width}x{media.height}:d={TITLE_CARD_SECONDS:.3f}:r={media.fps}",
+        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+        "-vf", filters,
+        "-t", f"{TITLE_CARD_SECONDS:.3f}",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        "-pix_fmt", "yuv420p", str(target),
+    ])
+    return target
+
+
+def _combine(previous: Path, incoming: Path, out: Path, kind: str | None, overlap: float, elapsed: float) -> None:
+    """Append one segment, using a cross-transition or a hard cut."""
+    if kind and overlap > 0:
+        offset = max(elapsed - overlap, 0.0)
+        graph = (
+            f"[0:v][1:v]xfade=transition={kind}:duration={overlap:.3f}:offset={offset:.3f}[v];"
+            f"[0:a][1:a]acrossfade=d={overlap:.3f}[a]"
+        )
+    else:
+        graph = "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]"
+    run([
+        ffmpeg_bin(), "-y", "-i", str(previous), "-i", str(incoming),
+        "-filter_complex", graph,
+        "-map", "[v]", "-map", "[a]",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+        "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart", str(out),
+    ])
+
+
 def compose_video(
     clips: list[dict],
     project_id: str,
@@ -185,11 +261,13 @@ def compose_video(
     subtitle_lines: list[dict] | None = None,
     bgm_path: str | None = None,
 ) -> dict:
-    """Concat shot clips, burn subtitles, and write the final vertical episode.
+    """Concat shot clips with their transitions, burn subtitles, mix BGM.
 
-    ``clips`` is a list of ``{video_path, audio_path, duration_s}`` in story
-    order. Audio is normalised to AAC so clips with and without a speech track
-    concatenate without stream mismatch.
+    ``clips`` is a list of ``{video_path, audio_path, duration_s, transition,
+    subtitle_lines}`` in story order. ``transition`` is the boundary *after*
+    that clip. Subtitle times on each clip are relative to its own start and are
+    re-based onto the encoded timeline, which differs from a plain sum once
+    transitions overlap and a title card is prepended.
     """
     media = get_settings().media
     root = ensure_project_dirs(project_id)
@@ -220,58 +298,150 @@ def compose_video(
         run(args)
         normalised.append(out)
 
-    concat_list = root / "final" / "_concat.txt"
-    concat_list.parent.mkdir(parents=True, exist_ok=True)
-    concat_list.write_text("".join(f"file '{path.name}'\n".replace(path.name, str(path)) for path in normalised), encoding="utf-8")
+    # Build the segment list: optional title card, then one per shot.
+    segments: list[dict] = []
+    if media.title_card and (title or ""):
+        segments.append(
+            {
+                "path": _make_title_card(root, media, title, ""),
+                "transition": TITLE_CARD_TRANSITION if media.transitions else (None, 0.0),
+                "lines": [],
+            }
+        )
+    for position, clip in enumerate(clips):
+        segments.append(
+            {
+                "path": normalised[position],
+                "transition": _transition_for(clip.get("transition"), media.transitions),
+                "lines": clip.get("subtitle_lines") or [],
+            }
+        )
+    for segment in segments:
+        segment["duration"] = float(media_facts(segment["path"]).get("duration_s", 0.0) or 0.0)
+
+    # Walk the timeline once so subtitle placement and the concat offsets agree.
+    starts: list[float] = []
+    cursor = 0.0
+    for index, segment in enumerate(segments):
+        starts.append(cursor)
+        overlap = segment["transition"][1] if index < len(segments) - 1 else 0.0
+        cursor += segment["duration"] - overlap
+    total_duration = cursor
+
+    placed: list[dict] = []
+    for index, segment in enumerate(segments):
+        for line in segment["lines"]:
+            start = starts[index] + float(line["start_s"])
+            end = starts[index] + float(line["end_s"])
+            placed.append(
+                {
+                    "text": line["text"],
+                    "start_s": round(min(start, total_duration), 2),
+                    "end_s": round(min(end, total_duration), 2),
+                }
+            )
+    if not any(segment["lines"] for segment in segments):
+        placed = list(subtitle_lines or [])
 
     joined = root / "final" / "_joined.mp4"
-    run([ffmpeg_bin(), "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list), "-c", "copy", str(joined)])
+    current = segments[0]["path"]
+    elapsed = segments[0]["duration"]
+    for index in range(1, len(segments)):
+        previous_transition = segments[index - 1]["transition"]
+        out = root / "final" / f"_join_{index:03d}.mp4"
+        _combine(
+            current,
+            segments[index]["path"],
+            out,
+            previous_transition[0],
+            previous_transition[1],
+            elapsed,
+        )
+        if current.name.startswith("_join_"):
+            current.unlink(missing_ok=True)
+        current = out
+        elapsed += segments[index]["duration"] - previous_transition[1]
+    if current != joined:
+        run([ffmpeg_bin(), "-y", "-i", str(current), "-c", "copy", "-movflags", "+faststart", str(joined)])
+        current.unlink(missing_ok=True)
 
-    ass_path = None
-    if subtitle_lines:
-        ass_path = _write_ass(root, subtitle_lines, media)
+    ass_path = _write_ass(root, placed, media) if placed else None
     target = root / "final" / "final_video.mp4"
 
-    if ass_path and bgm_path:
-        run([
-            ffmpeg_bin(), "-y", "-i", str(joined), "-i", str(root / bgm_path),
-            "-filter_complex",
-            f"[0:v]ass={_escape_filter_path(ass_path)}[v];"
-            f"[1:a]volume=0.18,aloop=loop=-1:size=2e9[bgm];"
-            f"[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=0[a]",
-            "-map", "[v]", "-map", "[a]",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
-            "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-            str(target),
-        ])
-    elif ass_path:
-        run([
-            ffmpeg_bin(), "-y", "-i", str(joined),
-            "-vf", f"ass={_escape_filter_path(ass_path)}",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
-            "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-            str(target),
-        ])
+    bgm = _resolve_bgm(root, bgm_path or media.bgm_path)
+    video_filter = f"ass={_escape_filter_path(ass_path)}" if ass_path else "null"
+    args = [ffmpeg_bin(), "-y", "-i", str(joined)]
+    if bgm:
+        args += ["-stream_loop", "-1", "-i", str(bgm)]
+        graph = (
+            f"[0:v]{video_filter}[v];"
+            f"[1:a]volume={media.bgm_volume:.3f}[bg];"
+            f"[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0[a]"
+        )
     else:
-        run([ffmpeg_bin(), "-y", "-i", str(joined), "-c", "copy", "-movflags", "+faststart", str(target)])
+        graph = f"[0:v]{video_filter}[v];[0:a]anull[a]"
+    # Bound the output explicitly. A looped BGM never ends, so -shortest picks
+    # the first stream to finish and truncated the episode to the BGM length in
+    # practice (3.80s cut to 3.23s). The known segment total is authoritative.
+    args += [
+        "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+        "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart", "-t", f"{total_duration:.3f}", str(target),
+    ]
+    run(args)
 
-    for path in normalised + [joined, concat_list]:
+    for path in normalised + [joined]:
         path.unlink(missing_ok=True)
 
+    # A clip's transition describes the boundary that follows it, so the last
+    # clip contributes none. Segment indices are offset by the title card.
+    offset = len(segments) - len(clips)
+    transitions = [
+        {
+            "after": index,
+            "label": clip.get("transition", ""),
+            "applied": segments[index + offset]["transition"][0],
+        }
+        for index, clip in enumerate(clips[:-1])
+    ]
     _write_meta(
         root / "final" / "final_video.json",
         {
             "clips": [clip["video_path"] for clip in clips],
             "title": title,
-            "subtitle_lines": len(subtitle_lines or []),
+            "subtitle_lines": len(placed),
             "canvas": f"{media.width}x{media.height}@{media.fps}",
+            "duration_s": round(total_duration, 3),
+            "title_card": bool(media.title_card and title),
+            # The card itself cross-fades into the first shot, which is an
+            # overlap on the timeline just like any clip boundary.
+            "title_card_transition": (
+                segments[0]["transition"][0]
+                if len(segments) > len(clips) and segments[0]["transition"][0]
+                else ""
+            ),
+            "bgm": str(bgm) if bgm else "",
+            "transitions": transitions,
         },
     )
     return {
         "final_video_path": str(target.relative_to(root)),
         "subtitle_path": str(ass_path.relative_to(root)) if ass_path else "",
         "clip_count": len(clips),
+        "duration_s": round(total_duration, 3),
     }
+
+
+def _resolve_bgm(root: Path, configured: str | None) -> Path | None:
+    """BGM may be absolute or relative to the project; missing means none."""
+    if not configured:
+        return None
+    candidate = Path(configured)
+    if candidate.is_absolute():
+        return candidate if candidate.exists() else None
+    local = root / candidate
+    return local if local.exists() else None
 
 
 def make_cover(project_id: str, *, title: str, subtitle: str = "") -> dict:

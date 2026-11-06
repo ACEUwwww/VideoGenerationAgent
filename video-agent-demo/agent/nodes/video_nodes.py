@@ -19,6 +19,7 @@ from agent.settings import get_settings
 from mcp_servers import keyframe_memory
 from mcp_servers import video_tools_server as tools
 from mcp_servers.evaluators import evaluate_video as qa_video
+from mcp_servers.providers import get_vision_judge
 from mcp_servers.videobench_eval import evaluate_clip
 
 
@@ -128,6 +129,8 @@ def evaluate_clip_multidim(state: AgentState) -> AgentState:
         shot=shot,
         reference_frame=reference,
         reference_shot_size=anchor_size,
+        keyframe_path=keyframe,
+        mllm_judge=get_vision_judge(),
     )
 
     entry = keyframe_memory.record(
