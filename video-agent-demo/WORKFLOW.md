@@ -212,28 +212,21 @@ ASS 字幕使用 Noto Sans CJK，64px 白字黑边，底部居中留 260px 边�
 | 能力 | `mock` | 真实 |
 |---|---|---|
 | 图像 | PIL 绘制分镜卡 | `ark` / Seedream 4.0 |
-| 视频 | ffmpeg zoompan 推拉 | `ark` / Seedance 1.0 |
+| 视频 | ffmpeg zoompan 推拉 | `ark` / Seedance |
 | 语音 | 静音 AAC 轨 | `doubao_speech` / Seed-Audio 1.0 |
+| 视觉质检 | 关闭，退回像素测量 | `ark` / doubao-seed-2-1-pro |
 
-**mock 不是空壳**：图像是真实 PNG，视频是真实 H.264，音频是真实 AAC。整条合成、字幕、封面链路都真实执行，只是创意内容为合成品。用于零成本验证流程完好。
+mock 用于零成本验证流程完好性，产出的是真实 PNG / H.264 / AAC，只是创意内容为合成品。mock 结果带 `mock: true` 标记，条件边直接放行，不触发注定无效的返工。
 
 **付费保护**：Ark 按次计费，`ARK_ALLOW_PAID=1` 未设置时 provider 一律拒绝调用，即使 key 已配置。误跑一整部多镜短剧不会产生账单。
 
 ---
 
-## 四、三套独立的鉴权
+## 四、鉴权
 
-这是最容易踩的坑，三个服务互不通用：
-
-| 服务 | 域名 | 鉴权方式 |
-|---|---|---|
-| DeepSeek | `api.deepseek.com` | `Authorization: Bearer <key>` |
-| 火山方舟 Ark | `ark.cn-beijing.volces.com/api/v3` | `Authorization: Bearer <Ark key>` |
-| 豆包语音 Speech | `openspeech.bytedance.com/api/v3` | `X-Api-Key: <Speech key>` |
-
-方舟的 key 在豆包语音上会返回 401 `Invalid X-Api-Key`。
-
-另外一个细节：豆包语音 `/tts/create` 的**模型名校验发生在鉴权之前**。模型名写错会返回 403 `fail to convert model to resource_id`，看起来像 key 问题，实际是模型名不对。正确模型名是 `seed-audio-1.0`，请求体字段是 `text_prompt` 而不是 `text`。
+三个服务用三套互不通用的凭据（DeepSeek / 方舟 Ark 用 `Authorization: Bearer`，
+豆包语音用 `X-Api-Key`）。域名、易踩的坑与配置项见
+[README 第 7 节](README.md#7-配置)。
 
 ---
 
@@ -296,7 +289,7 @@ Windows 上与平台相关的只有三处，代码本身完全一致：
 ./run_demo.sh test
 ```
 
-28 项测试，覆盖全链路、关键帧回灌、跨景别跳过、并发原子性、provider 付费保护等。
+56 项测试，覆盖全链路、关键帧回灌、跨景别跳过、转场与字幕时间轴、视觉 judge 单次调用、并发原子性、provider 付费保护等。
 
 ### 5.4 零成本试跑
 
@@ -304,7 +297,8 @@ Windows 上与平台相关的只有三处，代码本身完全一致：
 ./run_demo.sh simulate
 ```
 
-用 mock provider 跑一部 3 镜短剧，约 30 秒。验证的是流程完好性，不是创意质量。
+用 mock provider 跑一部 3 镜短剧，约 30 秒，零成本验证整条编排链路
+（节点流转、条件边、合成、字幕、封面）完好，不用于评估创意质量。
 
 ### 5.5 真实生成
 
@@ -343,67 +337,23 @@ cd frontend && npm run dev   # 前端 :5173
 
 ### 5.7 产物位置
 
-```
-workspace/projects/<project_id>/
-  project.json          项目元数据
-  state.json            完整运行状态
-  events.jsonl          Agent 事件流（前端增量轮询）
-  bible.json            设定集
-  shots/shot_001.json   分镜
-  images/shot_001.png   关键帧
-  videos/shot_001.mp4   片段
-  audio/shot_001.wav    原始配音
-  audio/shot_001_fit.m4a 适配后的配音
-  keyframes/shot_001.png 关键帧记忆
-  keyframes/memory.json  锚点与漂移记录
-  subtitles/subtitles.ass 字幕
-  final/final_video.mp4  成片
-  final/cover.png        封面
-```
+目录树见 [README 第 8 节](README.md#8-产物)。前端通过
+`GET /api/projects/<id>/assets/<path>` 读取这些文件，支持 HTTP Range，
+播放器可拖动进度。
 
 ---
 
-## 六、关键配置项
+## 六、配置、成本与边界
 
-| 变量 | 说明 | 默认 |
-|---|---|---|
-| `IMAGE_PROVIDER` / `VIDEO_PROVIDER` | `mock` 或 `ark` | `mock` |
-| `TTS_PROVIDER` | `mock` 或 `doubao_speech` | `mock` |
-| `ARK_ALLOW_PAID` | 设为 `1` 才允许真实付费调用 | 未设置 |
-| `ARK_VIDEO_RESOLUTION` | 视频分辨率，影响成本 | `720p` |
-| `VIDEO_WIDTH` / `VIDEO_HEIGHT` | 画布尺寸 | `1080` / `1920` |
-| `IMAGE_RETRIES` / `VIDEO_RETRIES` | 返工预算 | `1` / `1` |
-| `IMAGE_REFERENCE` | 是否启用关键帧回灌 | `1` |
+配置项清单、各模型的成本量级、已知能力边界都维护在 README，避免两处各写一遍：
+
+- [配置](README.md#7-配置)
+- [成本与耗时](README.md#10-成本与耗时)
+- [已知边界](README.md#11-已知边界)
 
 ---
 
-## 七、成本与耗时参考
-
-| 项 | 单次 | 说明 |
-|---|---|---|
-| Seedream 出图 | 8.1k output tokens | 每镜 1 次 |
-| Seedance 出视频 | 约 35-40k tokens | 每镜 1 次，按时长计 |
-| Seed-Audio 配音 | 约 16 秒延迟 | 每句台词 1 次 |
-| DeepSeek | 每个镜头约 3-4 次调用 | 规划 + 提示词 + 偶尔修复 |
-
-3 镜短剧：约 200 秒，3 次出图 + 3 次出视频 + 若干次配音。
-
----
-
-## 八、已知边界
-
-| 项 | 状态 | 说明 |
-|---|---|---|
-| 多角色音色 | 未实现 | 所有台词用同一音色 |
-| 视频侧参考图 | 不可用 | Seedance 1.0 不支持 `reference_image`，需 2.0+ |
-| 视觉语义评审 | 未接入 | 质检是像素测量，抓不住「脸画歪」 |
-| 任务取消/恢复 | 未实现 | `BackgroundTasks` 启动后只能等 |
-| BGM 混音 | 未接入 | `compose_video` 已支持 `bgm_path`，无调用方 |
-| 转场实现 | 未实现 | 分镜有 `transition` 字段，合成时全部按硬切 |
-
----
-
-## 九、运行态与故障恢复
+## 七、运行态与故障恢复
 
 ### 心跳与僵尸运行回收
 

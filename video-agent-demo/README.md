@@ -1,50 +1,306 @@
 # 竖屏短剧生成 Agent
 
-一个端到端的竖屏短剧（9:16）自动生产 Agent。用 LangGraph 编排「剧本 → 设定集 → 分镜 → 关键帧 → 图生视频 → 配音 → 字幕 → 成片」的状态机，用 DeepSeek 承担全部创作与修复推理，用 MCP-like 工具层封装图像/视频/语音生成，并按 Video-Bench 的维度体系做自动化质检，评估结果回流到条件边驱动返工。
+输入一个创意，输出一条带字幕、配音与配乐的 1080×1920 竖屏短剧成片。
 
-原始 demo 只有 mock 流程；当前版本把**创作、渲染、质检、合成四条链路都实现为真实可运行**，只有付费媒体模型默认保持在 mock 状态。
+用 LangGraph 编排「剧本 → 设定集 → 分镜 → 关键帧 → 图生视频 → 配音 → 字幕 → 合成」的状态机，DeepSeek 承担全部创作与修复推理，MCP-like 工具层封装图像/视频/语音生成，Video-Bench 维度体系做自动化质检，评估结果回流到条件边驱动返工。
+
+> 每个节点的职责边界与执行细节见 [WORKFLOW.md](WORKFLOW.md)。
 
 ---
 
-> 完整的执行链路、每个节点的职责边界与使用方法，见 [WORKFLOW.md](WORKFLOW.md)。
-
-## 1. 整体架构
+## 1. 架构
 
 ```
-frontend/          React + Vite + TS，只负责输入、展示分镜/播放器/日志/评分
-backend/           FastAPI：项目 CRUD、启动 Agent、增量事件轮询、媒体资源(Range)
-agent/             LangGraph 状态机：规划、生成、质检、修复、合成
+frontend/          React + Vite + TS，输入、分镜/播放器/评分/日志展示
+backend/           FastAPI：项目 CRUD、启动 Agent、增量事件轮询、媒体 Range
+agent/             LangGraph 状态机
+  graph.py         16 节点、3 条条件边
+  state.py         AgentState 定义与持久化
   llm_client.py    DeepSeek 客户端（JSON 模式、重试、用量统计）
-  prompts.py       短剧生产提示词（设定集/分镜/图像/运动/质检/修复/字幕）
-  nodes/           每类节点一个模块
+  prompts.py       短剧生产提示词
+  nodes/           每个节点一个模块
   settings.py      统一配置入口（.env）
 mcp_servers/       MCP-like 工具层
-  video_tools_server.py  生成/配音/合成/封面
-  providers/       mock 与 ark 两套 provider，按 .env 选择
-  metrics.py       基于解码像素的帧级测量
-  videobench_eval.py  Video-Bench 维度体系打分
-  keyframe_memory.py  关键帧记忆（跨镜一致性锚点）
-  evaluators.py    文件级硬性校验（分辨率/时长/编码/体积）
+  video_tools_server.py  生成 / 配音 / 时长适配 / 合成 / 封面
+  providers/             mock 与 ark 两套 provider，按 .env 选择
+  metrics.py             基于解码像素的帧级测量
+  videobench_eval.py     Video-Bench 维度打分
+  keyframe_memory.py     关键帧记忆（跨镜一致性锚点）
+  evaluators.py          文件级硬性校验
 workspace/projects/<id>/  每次运行的全部产物
-tests/             pytest：全链路、指标、provider
+tests/             pytest：56 项
 ```
 
-## 2. 启动
+**三层职责分离**，替换任何一层都不影响其他层：
 
-支持 Linux、macOS 和 Windows。三者的差别只在依赖安装方式，Python 代码完全一致。
+| 层 | 位置 | 职责 |
+|---|---|---|
+| 编排 | `agent/` | 状态流转、决策、重试 |
+| 工具 | `mcp_servers/` | 外部能力调用，模型无关 |
+| 呈现 | `backend/` + `frontend/` | HTTP API、本地存储、界面 |
+
+Agent 节点不直接依赖任何模型供应商，只调用 `mcp_servers` 的标准接口。
+
+---
+
+## 2. LangGraph State
+
+### 2.1 状态定义
+
+`AgentState` 是一个 `TypedDict`，承载整部短剧的全部事实，是运行期的唯一真相源。
+
+```python
+class AgentState(TypedDict, total=False):
+    # 输入
+    project_id: str
+    user_prompt: str
+    style: str
+    genre: str
+    shot_count: int
+
+    # 设定集（plan_story 产出）
+    logline: str          # 烧到封面上
+    tone: str             # 调性，贯穿全部提示词
+    setting: str
+    outline: str
+    hook: str             # 首镜 3 秒内的钩子
+    ending: str
+    characters: list[dict]  # appearance 是跨镜一致性的命脉
+
+    # 分镜与推进
+    shots: list[dict]
+    current_shot_index: int
+
+    # 质检与返工
+    evaluation_score: float
+    retry_count: int
+
+    # 记忆与产出
+    keyframe_memory: dict      # compact 后的展示摘要
+    episode_report: dict
+    final_video_path: str
+    subtitle_path: str
+    usage: dict[str, Any]
+```
+
+`shots[]` 每一项记录单镜的全部状态：分镜字段（景别/运镜/台词/时长/转场）、三类提示词、媒体路径、质检分数、重试计数、字幕行。
+
+### 2.2 状态写入的两条纪律
+
+**事件只写增量。** 事件流写 `events.jsonl`，state 里只留 `event_count` 计数器。早期版本把整份事件列表放进 state，导致每次节点写入都要重写 MB 级 JSON。
+
+**指纹留在 memory.json。** `keyframe_memory` 每个关键帧带 256 维指纹向量，3 镜时占 state 的 55%。现在指纹只存 `keyframes/memory.json`，state 里是 `compact()` 后的摘要（锚点路径、分数、景别、漂移量）。3 镜实测 38KB → 16.7KB。
+
+### 2.3 图的拓扑
+
+```
+analyze_user_goal → plan_story → plan_shots
+        ↓
+┌──────────────────── 每个镜头循环 ─────────────────────┐
+│ generate_image_prompt → generate_image → evaluate_image │
+│        ↑                      │                         │
+│   rewrite_image_prompt ←──────┘  (条件边 retry/video)   │
+│        ↓                                                │
+│ generate_video_prompt → generate_video → evaluate_video │
+│        ↑                      │                         │
+│   rewrite_video_prompt ←──────┘  (条件边 retry/next)    │
+│        ↓                                                │
+│ evaluate_clip → synthesize_dialogue → advance_shot      │
+└─────────────────────────────────────────────────────────┘
+        ↓ (条件边 more/compose)
+compose_video → finish → END
+```
+
+三条条件边都由纯函数决定，不含副作用：
+
+| 条件边 | 判据 |
+|---|---|
+| `should_retry_image` | mock 直接放行；通过放行；未达上限重写提示词 |
+| `should_retry_video` | 同上，上限取 `VIDEO_RETRIES` |
+| `has_more_shots` | `current_shot_index < len(shots)` |
+
+**mock 结果直接放行，不返工。** 早期 mock provider 把分数封顶在门槛之下，导致每镜固定多烧 2 次 LLM 修复调用，而修复根本不可能改变占位图。现在 mock 结果打 `mock: true` 标记，条件边立即放行。
+
+### 2.4 崩溃恢复
+
+每次节点边界与 45 秒一次的心跳线程都写 `run_heartbeat_at`。超过 `STALE_RUN_SECONDS`（600 秒）没有心跳即判定僵尸，允许重新认领，无需手工改 JSON。`claim_run()` 在锁内完成「读状态 + 置 running」，8 线程并发实测只有 1 个成功。
+
+---
+
+## 3. Video-Bench 打分
+
+### 3.1 七个维度
+
+对齐 Video-Bench 的维度体系，权重与判据如下：
+
+| 维度 | 权重 | 判据 |
+|---|---:|---|
+| `imaging_quality` | 0.15 | 拉普拉斯清晰度、对比度、曝光 |
+| `aesthetic_quality` | 0.15 | 色彩丰富度、曝光、对比度 |
+| `temporal_consistency` | 0.20 | 闪烁（帧差的二阶差分）、亮度抖动 |
+| `motion_effects` | 0.15 | 帧间差落在运动区间、帧差离散度 |
+| `color_consistency` | 0.10 | 与锚点的 RGB 直方图余弦 |
+| `scene_consistency` | 0.15 | 与锚点的结构相似度（均值去除后的亮度缩略图） |
+| `object_consistency` | 0.10 | 中心裁剪区域的结构 + 色彩一致度 |
+
+综合分 = 各维度分数按权重加权平均，`PASS_SCORE = 0.62`。
+
+### 3.2 区间打分而非单点阈值
+
+早期阈值按静态卡片校准（帧间差 ≈4），在真实 Seedance 片段上（帧间差 18.9、flicker 8.8）被误判为抖动，`motion_effects` 得 0 分。现在改成**区间打分**：区间内满分，双向衰减。
+
+```python
+motion = _band(delta, 0.5, 8.0, 45.0, 70.0)
+# 2-6 是接近静止的卡片；8-45 是正常运动；>70 是退化成噪声
+```
+
+同一段素材重算后综合分从 0.518 回到 0.823。
+
+### 3.3 跨景别自动跳过
+
+`scene_consistency` 比较整帧结构相似度。当分镜本身要求换景别（特写→中景）时，结构相似度天然低，这是构图变化而非场景漂移——实测这类误判落在 0.05–0.28。
+
+现在按景别分组判断可比性：
+
+```python
+FRAMING_GROUPS = {"特写": "close", "近景": "close", "中景": "mid",
+                  "全景": "wide", "远景": "wide", "过肩": "mid"}
+```
+
+跨组时该维度标 `applicable=False`、`score=None`，不参与加权。`object_consistency` 在有参考帧时改用中心裁剪区域，对机位变化免疫。
+
+### 3.4 视觉模型语义打分
+
+像素测量抓不住「脸画歪了」。`evaluate_clip` 接受一个可选的 MLLM 钩子：
+
+```python
+mllm_judge(image_path, prompt) -> (scores_dict, reason)
+```
+
+接入 `doubao-seed-2-1-pro-260915`（方舟 Chat API），三个设计要点：
+
+**喂全分辨率关键帧，不喂测量帧。** `extract_frames()` 抽的是 192px 宽缩略图，high 模式要求约 226 万像素，喂进去会被放大 34 倍面积、按 1280 token 计费，却看不出人脸形变。judge 收到的是 `keyframe_memory.extract_keyframe()` 存下的 1080×1920 原图。
+
+**一次调用判四个维度。** 按维度循环调用会让同一张图重复上传，一镜 3 次 × 1280 token。`dimension_prompt()` 一次输出 `imaging / aesthetic / motion / object_consistency`，单价降到 1 次。
+
+**与测量值取 max，不覆盖。** judge 的 1-5 分映射到 0-1 后与像素测量取最大值，原始分记 `mllm_score_1to5`、理由记 `mllm_reason`。任一环节失败只记 `judge_error`，测量路径不受影响。
+
+未配置 key 或未开 `ARK_ALLOW_PAID` 时 `get_vision_judge()` 返回 `None`，质检退回纯测量路径，行为与不存在视觉模型时完全一致。
+
+---
+
+## 4. 关键帧提取与一致性
+
+### 4.1 关键帧从哪来
+
+每镜视频渲染完成后，从**成片片段**里抽帧，而不是复用生成时的输入图：
+
+```python
+def extract_keyframe(video_path: Path, target: Path, at_s: float = 0.15) -> Path:
+    run([ffmpeg_bin(), "-y", "-ss", f"{at_s:.3f}", "-i", str(video_path),
+         "-frames:v", "1", str(target)])
+```
+
+取 0.15 秒而非第 0 帧：视频模型的第一帧有时仍是未收敛的起始态，推进几帧后画面才稳定。
+
+抽出的帧有两个用途——存进记忆库做漂移度量，以及作为后续镜头的图像生成参考。
+
+### 4.2 三层一致性机制
+
+**第一层：文本锚点（全程）。** 设定集里每个角色的 `appearance` 是一段具体到可被画师复现的外形描述。`shot_anchor()` 把它拼进每一镜的图像提示词，并做兜底校验：
+
+```python
+if anchor and anchor.split(":")[0] not in prompt:
+    prompt = f"{prompt} Character appearance: {anchor}."
+```
+
+**第二层：关键帧记忆（跨镜度量）。** 首镜通过质检的关键帧成为全片锚点，后续每镜与它比较：
+
+```python
+memory["anchor"] = 首镜关键帧路径          # 只设一次
+entry["drift_vs_anchor"] = similarity(anchor["fingerprint"], fingerprint_data)
+```
+
+指纹是两段向量：`hist`（RGB 直方图）与 `thumb`（均值去除后的亮度缩略图）。前者对色彩漂移敏感，后者对结构漂移敏感——均值去除使得整体亮度变化不被读成结构匹配。
+
+**第三层：参考图回灌（图像侧）。** `IMAGE_REFERENCE=1`（默认开）时，锚点关键帧作为 `image` 参数传给 Seedream，后续镜头的构图条件被首镜锁住。实测同一部两镜短剧：色彩一致性 0.92 → 0.98，主体一致性 0.46 → 0.56。
+
+首镜没有锚点，它自己建立锚点；`_anchor_reference()` 返回空串时正常生成。
+
+### 4.3 为什么长视频不会漂
+
+一致性不是靠单点手段，而是三层的叠加与互相兜底：
+
+| 漂移类型 | 压制手段 |
+|---|---|
+| 人物长相改变 | 文本锚点逐字复用 + 参考图回灌 |
+| 服装/配色漂移 | 参考图回灌（`image` 参数）+ 色彩直方图度量 |
+| 构图/机位跳变 | 中心裁剪的主体比对，机位变化时不误判 |
+| 逐镜误差累积 | 所有镜头都对齐**同一个**首镜锚点，不链式传递 |
+
+最后一条是关键：如果每镜都以上一镜为参考，误差会沿链条累积放大。这里所有镜头都锚定首镜，误差不累积。
+
+---
+
+## 5. 合成
+
+`compose_video` 用 ffmpeg 完成归一化、转场、字幕、配乐、封面。
+
+### 5.1 转场
+
+分镜的 `transition` 映射到真实的 `xfade`/`acrossfade`：
+
+| 分镜写法 | 滤镜 | 重叠 |
+|---|---|---:|
+| 叠化 / dissolve | `fade` | 0.40s |
+| 闪白 | `fadewhite` | 0.25s |
+| 推黑 / 淡出 | `fadeblack` | 0.30s |
+| 硬切 / cut | 无（concat） | 0s |
+
+重叠是**真实时间**：总时长按 `Σduration − Σoverlap` 缩短。`VIDEO_TRANSITIONS=0` 可回退纯硬切。
+
+### 5.2 字幕
+
+字幕时间在 `compose_video` 内按**编码后的时间线**重排。这不能在外层做——转场重叠会缩短总长，片头卡会整体后移，任何一处变化都会让所有台词错位。
+
+字号、边距、描边按 1080×1920 画布固定，字体由 `font_path()` 跨平台探测（Windows 雅黑 / macOS 苹方 / Linux Noto CJK），失败时可用 `CJK_FONT_PATH` 指定。
+
+### 5.3 片头字卡与配乐
+
+片头字卡 1.2 秒，与首镜交叉淡入（`VIDEO_TITLE_CARD=1`，默认开）。
+
+BGM 用 `aloop` 循环铺底、与台词音轨 `amix`，音量 `BGM_VOLUME`（默认 0.18）。
+
+**这里踩过一个坑**：用 `-shortest` 收尾会把整集裁到 BGM 自身长度（实测 3.80s → 3.23s，视频轨只剩 3.2s）。现在按已知片段总长显式 `-t` 定长。
+
+### 5.4 时长适配
+
+台词长度由 LLM 决定，镜头时长由分镜决定，两者独立。实测一句 4.58 秒的台词配 3 秒镜头，直接合成会把语音砍断。
+
+`fit_audio()` 的处理：
+
+| 原始/目标比例 | 动作 |
+|---|---|
+| 0.85 – 1.45 | `atempo` 时间伸缩，保持自然语速 |
+| > 1.45 | 压到 1.45 倍后补静音 |
+| < 0.85 | 放慢到 0.85 倍后补齐 |
+
+---
+
+## 6. 启动
+
+三个平台的差别只在依赖安装，Python 代码完全一致。
 
 ### Linux / macOS
 
 ```bash
 cd video-agent-demo
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env                    # 填入 DEEPSEEK_API_KEY / ARK_API_KEY / TTS_API_KEY
-
-# Linux 需要装 ffmpeg 与中文字体；macOS 用 brew install ffmpeg，字体自带
+cp .env.example .env                    # 填 DEEPSEEK_API_KEY / ARK_API_KEY / TTS_API_KEY
 apt-get install -y ffmpeg fonts-noto-cjk
 
 ./run_demo.sh check                     # 环境自检，零成本
-.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+./run_demo.sh serve                     # http://localhost:8000
 ```
 
 ### Windows
@@ -53,29 +309,20 @@ apt-get install -y ffmpeg fonts-noto-cjk
 cd video-agent-demo
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-copy .env.example .env                  :: 填入三个 key
+copy .env.example .env
 
-:: ffmpeg 需自带 libass，否则字幕无法烧录
-winget install Gyan.FFmpeg
-:: 或者从 https://www.gyan.dev/ffmpeg/builds/ 下载 full 版本并加入 PATH
-
-run_demo.bat check                      :: 环境自检，零成本
-.venv\Scripts\uvicorn backend.main:app --host 0.0.0.0 --port 8000
+winget install Gyan.FFmpeg               :: 必须含 libass，否则字幕无法烧录
+run_demo.bat check
+run_demo.bat serve
 ```
 
-Windows 三处需要注意：
+Windows 有三处要注意：ffmpeg 必须带 libass（`full` 构建默认带）；字体自动探测微软雅黑，缺失时设 `CJK_FONT_PATH`；所有子进程带 `CREATE_NO_WINDOW`，不会闪黑框。
 
-- **ffmpeg 必须包含 libass**。`full` 构建默认带，`essentials` 也可能带，但精简版没有。`run_demo.bat check` 会直接检测并给出结论。
-- **中文字体**：Windows 10+ 自带微软雅黑（`C:\Windows\Fonts\msyh.ttc`），会自动识别。若装在精简镜像里缺失，设置环境变量 `CJK_FONT_PATH` 指向任意中文字体文件即可，`CJK_FONT_FAMILY` 可另行指定 ASS 字幕使用的字体族名。
-- **控制台窗口**：所有 ffmpeg 子进程都带 `CREATE_NO_WINDOW`，不会闪烁黑框。
-
-### 前端（两个平台相同）
+### 前端
 
 ```bash
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
-
-### 命令对照
 
 | 用途 | Linux / macOS | Windows |
 |---|---|---|
@@ -84,135 +331,63 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 | 零成本试跑 | `./run_demo.sh simulate` | `run_demo.bat simulate` |
 | 启动后端 | `./run_demo.sh serve` | `run_demo.bat serve` |
 
-两套脚本只是入口，实际逻辑在 `scripts/doctor.py` 与 `scripts/simulate.py`，Python 代码跨平台共用。
-
 ### 连通性自检
 
-服务起来后，`GET /api/health/connectivity` 给出一份零计费的三层报告：
-
 ```bash
-curl -s http://127.0.0.1:31113/api/health/connectivity | python -m json.tool
+curl -s http://127.0.0.1:8000/api/health/connectivity | python -m json.tool
 ```
 
-| 层 | 内容 |
-|---|---|
-| `server` | 从 `/proc/net/tcp` 读到的实际监听地址，再对 `127.0.0.1` 做一次真实 socket connect |
-| `outbound` | 并发对 DeepSeek / 方舟 / 豆包语音各发一次不鉴权 GET，区分「网络不通」与「通了但凭据被拒」 |
-| `inbound` | 明确写明外部可达性无法从容器内验证，并给出客户端侧命令 |
+零计费的三层报告：`server`（从 `/proc/net/tcp` 读实际监听地址 + 真实 socket connect）、`outbound`（并发对 DeepSeek / 方舟 / 豆包语音各发一次不鉴权 GET）、`inbound`（明确说明外部可达性无法从容器内验证）。
 
-`/health` 只说明进程还在；这个接口才回答「真的能接受连接、上游也通」。
-它不触发任何生成调用，可以随便跑。
+`/health` 只说明进程还在，这个接口才回答「真的能接受连接、上游也通」。
 
-`outbound` 里各服务的判读：
+判读 `outbound`：
 
-- `status 200` + `credential accepted` —— 网络与 key 都正常
-- `status 401/403` —— 网络通，key 没配或无效
-- `status 405` —— 豆包语音的 TTS 端点只接受 POST，405 本身就是「主机可达」的证据
-- `reachable: false` —— DNS、TLS 或出网被阻断，`detail` 里是具体异常
+- `200` + `credential accepted` —— 网络与 key 都正常
+- `401/403` —— 网络通，key 没配或无效
+- `405` —— 豆包语音 TTS 端点只接受 POST，405 本身就是主机可达的证据
+- `reachable: false` —— DNS、TLS 或出网被阻断
 
-## 3. Pipeline
+---
 
-```
-analyze_user_goal
-  → plan_story            DeepSeek 生成设定集（角色外观锚点、三幕梗概、钩子）
-  → plan_shots            DeepSeek 生成分镜（景别/运镜/台词/情绪/音效/时长/转场）
-  → 对每个 shot:
-      generate_image_prompt   LLM 写图像提示词，逐字嵌入角色外观锚点
-      generate_image          走 IMAGE_PROVIDER
-      evaluate_image          文件级质检 → 不通过则 rewrite_image_prompt 重试
-      generate_video_prompt   LLM 写运动提示词
-      generate_video          走 VIDEO_PROVIDER（图生视频）
-      evaluate_video          文件级质检 → 不通过则 rewrite_video_prompt 重试
-      evaluate_clip           抽关键帧 → 写入关键帧记忆 → 七维打分
-      synthesize_dialogue     台词配音 + 字幕切分
-      advance_shot
-  → compose_video         归一化 → concat → 字幕烧录 → 封面
-  → finish                汇总全片多维报告与用量
-```
-
-每个节点都向 `workspace/projects/<id>/events.jsonl` 追加
-`Thought / Action / Observation / Decision` 事件，前端增量轮询展示。
-
-## 4. 关键设计
-
-### 4.1 角色一致性（红果模式的核心）
-
-`plan_story` 为每个角色产出 `appearance` 外观锚点（脸型、发色、服装、显著特征），
-下游每条图像提示词都必须逐字包含它。质检里有一条硬检查：
-提示词不含锚点 → 直接扣分。这是跨镜人物不漂移的第一道闸门。
-
-### 4.2 关键帧记忆
-
-每个镜头生成后抽关键帧（`keyframes/shot_XXX.png`），首个通过的镜头成为
-**全片视觉锚点**。后续镜头与锚点做
-
-- **色彩一致性**：RGB 直方图余弦
-- **结构一致性**：去均值缩略图的余弦（对整体亮度平移不敏感，对布局变化敏感）
-
-漂移量写进 `keyframes/memory.json` 并在前端表格中按镜展示。
-这是「关键帧上下文约束后续片段」这条思路的可测量落地。
-
-### 4.3 Video-Bench 维度评估
-
-维度集合与权重对齐 Video-Bench：
-
-| 维度 | 权重 | 计算方式 |
-|---|---|---|
-| imaging_quality | 0.15 | 拉普拉斯锐度 + 对比度 + 曝光 |
-| aesthetic_quality | 0.15 | 色彩饱和度 + 曝光 + 对比度 |
-| temporal_consistency | 0.20 | 帧间差抖动（闪烁）+ 亮度抖动 |
-| motion_effects | 0.15 | 平均帧间差落在合适区间、连续性 |
-| color_consistency | 0.10 | 与锚点关键帧直方图余弦 |
-| scene_consistency | 0.15 | 与锚点关键帧结构余弦 |
-| object_consistency | 0.10 | 结构 0.6 + 色彩 0.4 |
-
-Video-Bench 原版用 GPT-4o Vision 打 1-5 分。这里是**像素测量**实现，不需要视觉模型，
-分数可复现；`videobench_eval.evaluate_clip` 保留了 `mllm_judge` 钩子，
-接入视觉模型后会在 `imaging/aesthetic/motion` 三个维度叠加 MLLM 评分并记录理由。
-
-### 4.4 评估结果驱动返工
-
-质检不做「看起来还行」：文件不存在、分辨率不对、时长偏离、无可解码流、
-体积异常小、提示词缺锚点，都会落到具体 issue 文本，进入
-`rewrite_image_prompt` / `rewrite_video_prompt`，由 LLM 按 issue 逐条修复。
-
-### 4.5 Provider 抽象
-
-```
-IMAGE_PROVIDER=mock|ark
-VIDEO_PROVIDER=mock|ark
-```
-
-- `mock`：本地真实渲染。图像是 PIL 绘制的 1080×1920 分镜卡（含中文说明与英文提示词），
-  视频是 ffmpeg zoompan 推拉的真实 H.264 片段，音频是真实 AAC 静音轨。
-  整条合成/字幕/封面链路都是真的，**零成本**。
-- `ark`：火山方舟。图像走 `POST /images/generations`（Doubao Seedream，`1080x1920`、
-  `watermark:false`）；视频走 `POST /contents/generations/tasks`（Doubao Seedance，
-  `ratio:9:16`，首帧以 base64 data URI 传入 `first_frame` 角色），异步轮询后下载。
-  代码里没有静默回退：provider 名字写错直接报配置错误。
-
-### 4.6 付费保护
-
-火山方舟按次计费。`ARK_ALLOW_PAID=1` 未设置时，影像/视频 provider 一律拒绝调用，
-即使 `.env` 里写了 `ARK_API_KEY`。这样误跑一整部多镜短剧不会产生账单。
-
-## 5. 配置项
+## 7. 配置
 
 | 变量 | 说明 |
 |---|---|
 | `DEEPSEEK_API_KEY` | 必需的 LLM key |
 | `LLM_MODEL` / `LLM_REASONER_MODEL` | 默认 `deepseek-chat` / `deepseek-reasoner` |
 | `IMAGE_PROVIDER` / `VIDEO_PROVIDER` | `mock` 或 `ark` |
-| `ARK_API_KEY` / `ARK_IMAGE_MODEL` / `ARK_VIDEO_MODEL` | 方舟凭据与模型 |
+| `ARK_API_KEY` | 方舟凭据（图像 + 视频 + 视觉共用） |
+| `ARK_IMAGE_MODEL` / `ARK_VIDEO_MODEL` | Seedream / Seedance 模型 ID |
+| `ARK_VISION_MODEL` | 视觉质检模型，留空则关闭 MLLM 打分 |
+| `ARK_VIDEO_RESOLUTION` | 默认 `720p` |
 | `TTS_PROVIDER` | `mock` 或 `doubao_speech` |
-| `TTS_API_KEY` | **豆包语音**的 key，不是方舟 key |
-| `TTS_MODEL` / `TTS_BASE_URL` | 默认 `seed-audio-1.0` / openspeech v3 |
+| `TTS_API_KEY` / `TTS_MODEL` / `TTS_BASE_URL` | 豆包语音凭据，默认模型 `seed-audio-1.0`，鉴权见下节 |
 | `ARK_ALLOW_PAID` | `1` 才允许真实付费调用 |
+| `IMAGE_RETRIES` / `VIDEO_RETRIES` | 返工预算，默认各 1 次 |
+| `IMAGE_REFERENCE` | `1` 时回灌锚点关键帧，默认开 |
 | `VIDEO_WIDTH` / `VIDEO_HEIGHT` / `VIDEO_FPS` | 画布，默认 1080×1920@30 |
-| `CJK_FONT_PATH` | 手动指定中文字体文件（自动探测失败时用） |
-| `CJK_FONT_FAMILY` | 手动指定 ASS 字幕字体族名 |
+| `VIDEO_TRANSITIONS` / `VIDEO_TITLE_CARD` | 转场与片头卡开关，默认开 |
+| `BGM_PATH` / `BGM_VOLUME` | 配乐文件与混音音量 |
+| `CJK_FONT_PATH` / `CJK_FONT_FAMILY` | 字体自动探测失败时手动指定 |
 
-## 6. 本地产物
+### 三套独立鉴权
+
+| 产品 | 端点 | 鉴权 |
+|---|---|---|
+| DeepSeek | `api.deepseek.com` | `Authorization: Bearer` |
+| 方舟 Ark | `ark.cn-beijing.volces.com/api/v3` | `Authorization: Bearer` |
+| 豆包语音 | `openspeech.bytedance.com/api/v3` | `X-Api-Key` |
+
+豆包语音走独立产品线，**用方舟 key 会返回 401 `Invalid X-Api-Key`**。两个易踩的坑：模型名校验发生在鉴权**之前**，写错返回 403 `fail to convert model to resource_id`，看着像 key 问题其实是模型名不对；请求体字段是 `text_prompt` 而非 `text`，返回 base64 WAV。
+
+### 付费保护
+
+任何真实生成调用前都检查 `ARK_ALLOW_PAID=1`，未设置直接抛错。没有从真实模型静默回退到 mock 的路径——半配置的运行不会产出看起来真实的假媒体。
+
+---
+
+## 8. 产物
 
 ```
 workspace/projects/<project_id>/
@@ -220,185 +395,65 @@ workspace/projects/<project_id>/
   shots/shot_001.json
   images/shot_001.png + .json
   videos/shot_001.mp4 + .json
-  audio/shot_001.m4a
-  keyframes/shot_001.png  memory.json
+  audio/shot_001.wav            原始配音
+  audio/shot_001_fit.m4a        适配后的配音
+  keyframes/shot_001.png        memory.json（含指纹）
   subtitles/subtitles.ass
   final/final_video.mp4  cover.png  final_video.json
 ```
 
-## 7. 测试
+`final_video.json` 记录片段列表、标题、字幕行数、画布、实际时长、片头卡、BGM 路径与每条转场的应用结果。
+
+---
+
+## 9. 测试
 
 ```bash
-.venv/bin/python -m pytest tests -q
+.venv/bin/python -m pytest tests -q     # 56 passed
 ```
 
-36 项测试，覆盖：
+| 文件 | 项数 | 覆盖 |
+|---|---:|---|
+| `test_pipeline.py` | 15 | 全链路、字幕时间轴、关键帧记忆、七维报告、转场重叠、BGM 定长、视觉 judge |
+| `test_platform.py` | 15 | 跨平台路径、字体探测、ffmpeg 封装 |
+| `test_framing.py` | 7 | 景别分组与跨景别跳过 |
+| `test_recovery.py` | 7 | 心跳、僵尸回收、并发认领 |
+| `test_metrics.py` | 6 | 像素指标性质 |
+| `test_providers.py` | 6 | 付费保护、未知 provider、重试边界 |
 
-- 全链路产出真实 mp4（分辨率/编码/时长断言）、字幕时间轴与烧录
-- 关键帧记忆锚点与漂移、回灌参考图的传递
-- 七维报告完整性、跨景别维度跳过、主体局部一致性
-- 提示词包含角色锚点、LLM 用量统计与媒体成本记账
-- provider 付费保护、未知 provider 报错、Ark 重试边界
-- 并发 run 的原子性、像素指标性质
+测试断言绑定实测数值而非存在性：转场重叠缩短总时长、字幕随片头卡后移、BGM 不改变总长、judge 只发一次调用且收到全分辨率关键帧。
 
-## 8. 真实云服务验证记录（2026-10-30）
+---
 
-在账号 `2133734537` 上做的实测，全部用最小调用量：
+## 10. 成本与耗时
 
-| 项 | 模型 | 结果 |
-|---|---|---|
-| 文生视频（480p/4s） | `doubao-seedance-1-0-pro-fast-251015` | ✅ 成功，4.04s / 480×864 / 24fps / 1.8MB |
-| 图生视频（首帧 data URI） | 同上 | ✅ 成功，4.04s / 480×864 |
-| 状态机 + 真实视频 | 同上 | ✅ 单镜 90.8s 完成，成片 1080×1920 h264 + AAC |
-| 文生图 | `doubao-seedream-4-0-20260415` | ✅ 成功，13s，1080×1920 PNG |
-| 参考图生图（`image` 参数） | 同上 | ✅ 成功，16s，人物/服装/色彩被参考图锁住，场景可换 |
-| 全真实 2 镜端到端 | Seedream 4.0 + Seedance 1.0 pro-fast | ✅ 112-205s，成片 1080×1920，综合 0.79-0.82 |
-| 全真实 3 镜端到端 | 同上 | ✅ 199s，综合 0.833，跨景别维度正确跳过 |
-| 语音合成 | `seed-audio-1.0` | ✅ 成功，16s 延迟，4.58s WAV，40kHz |
-| 全真实 3 镜 + 配音 | Seedream + Seedance + Seed-Audio | ✅ 216s，成片人声 max -2.9dB，台词密度 2/3 |
-| 文生图 | `doubao-seedream-5-0-pro-260628` | ⚠️ 已激活但 `429 SetLimitExceeded`（账号安全体验模式配额） |
-| 其他 seedream 变体 | — | ❌ `ModelNotOpen` / `InvalidEndpointOrModel.NotFound` |
-| 语音合成 | — | ❌ 方舟 key 在 `openspeech.bytedance.com/api/v3/tts/create` 返回 403 `fail to convert model to resource_id`；在 `/tts/unidirectional` 返回 401 `Invalid X-Api-Key`，需要独立的豆包语音凭据 |
+| 项 | 量级 |
+|---|---|
+| Seedream 出图 | 约 13s，每镜 1 次 |
+| Seedance 出视频 | 约 60-90s，每镜 1 次 |
+| Seed-Audio 配音 | 约 16s，每句台词 1 次 |
+| 视觉质检 | 约 12s，每镜 1 次（1280 图像 token） |
 
-已验证的接口约定：
+2 镜短剧约 112-205 秒；3 镜约 199 秒，加配音约 216 秒。
 
-- 视频创建：`POST /api/v3/contents/generations/tasks`，body 含 `model` / `content[]` / `ratio` / `resolution` / `duration`
-- 首帧：`content` 里 `{"type":"image_url","image_url":{"url":"data:image/png;base64,..."},"role":"first_frame"}`，小图 data URI 可接受
-- 轮询：`GET /api/v3/contents/generations/tasks/{id}`，`status` 取值 `succeeded|failed|cancelled`，成功时视频在 `content.video_url`
-- 480p + 9:16 实际产出 480×864，由合成阶段统一上采样到 1080×1920
+---
 
-**评分器校准**：初版阈值按 mock 卡片校准（帧间差 ≈4），在真实 Seedance 片段（帧间差 18.9、flicker 8.8）上误判为抖动，`motion_effects` 得 0 分。已改为区间打分（区间内满分，双向衰减），同一段素材重算后综合分从 0.518 回到 0.823。
+## 11. 已知边界
 
-## 9. 已知边界
+这些是**能力边界**，不是待修的缺陷：
 
-已经修掉的（2026-10-30 第二轮）：
+- **视频侧无参考图回灌**。Seedance 1.0 pro / pro-fast 只支持「图生视频-首帧」和「文生视频」，`reference_image` 角色是 2.0 及以上才有的能力。图像侧已实现，视频侧需开通 2.0+。
+- **单进程后台任务**。`BackgroundTasks` + `asyncio.to_thread`，无任务队列、无主动取消。僵死运行能被心跳回收，但正在跑的生成任务无法中断（Seedance 单次 60-90 秒，只能等返回）。
+- **字幕只覆盖台词**，没有旁白。片头卡是 ffmpeg 绘制，不经过 LLM。
+- **`scene_consistency` 只适合同机位漂移**。跨景别已自动跳过，但它不表达「同一场景不同构图」的语义一致性——那需要视觉模型判断。
+- **视觉质检按镜打分**。MLLM 看的是单镜关键帧，不做跨镜序列级判断。
 
-- **mock 造成的必然返工**：以前 mock provider 直接把分数封顶到 0.6，
-  而门槛是 0.78，导致每个镜头固定多烧 2 次 LLM 修复调用、而修复根本不可能
-  改变占位图。现在 mock 结果单独打 `mock: true` 标记，`should_retry_*` 直接放行，
-  实测 LLM 调用从 6 次降至 6 次（原本 8 次），重试计数恒为 0。
-- **Ark 调用无重试**：新增 `_post_with_retry`，只对连接错误与
-  `429/500/502/503/504` 重试（这些不会产生双份计费），业务 4xx 立即抛出。
-  轮询超时的报错现在带上最后一次轮询的具体错误，不再静默 `continue`。
-- **`/run` 并发竞态**：`claim_run()` 在锁内完成「读状态 + 置 running」，
-  8 线程并发实测只有 1 个成功。
-- **跨模块引用私有函数**：`metrics.py` 公开导出
-  `histogram_vector` / `thumb_vector` / `cosine`。
-- **成本未记账**：真实 provider 的调用次数与 token 累加进 `usage.media`，
-  mock 不计账。
-- **前端无历史项目列表**：侧栏新增项目列表，可切换历史项目。
-- **视频质检要求精确画布尺寸导致的重复计费**：原实现要求片段必须是
-  1080×1920，而 Seedance 720p/9:16 原生输出 704×1248，两个镜头因此各多跑一次
-  付费重试（2 镜花掉 4 次视频调用）。现在质检判断画幅比例（±3%）与最低可用
-  高度，合成阶段负责归一到画布。
-- **`ARK_VIDEO_RESOLUTION` 配置未生效**：`MediaSettings` 构造时漏传该字段，
-  永远走默认 `720p`。已接上，实测 `.env` 与环境变量覆盖均正确。
+---
 
-第四轮（2026-11-04）修复的三项：
+## 12. 后续路线
 
-- **崩溃或重启后项目永久卡死**：`claim_run()` 以前只看 `status == "running"`
-  就拒绝，没有任何超时判断。实测把状态置成 `running` 模拟进程被杀后，重试
-  永远返回 `False`，只能手工改 JSON 才能恢复。现在运行时会周期性写
-  `run_heartbeat_at`（45 秒一次的心跳线程 + 节点边界），超过
-  `STALE_RUN_SECONDS`（600 秒）没有心跳就判定为僵尸并允许重新认领；旧版本
-  留下的、完全没有心跳字段的 `running` 状态也可直接认领。
-- **`state.json` 随镜头线性膨胀**：`keyframe_memory` 里每个关键帧带一个
-  256 维指纹向量，3 镜时占 state 的 55%。现在指纹只存 `keyframes/memory.json`，
-  state 里保留 `compact()` 后的展示摘要（锚点路径、分数、景别、漂移量）。
-  3 镜实测 38KB → 16.7KB，`keyframe_memory` 字段从 21KB 降到 496 字节。
-- **三个从未被引用的提示词模板**：`SUBTITLE_SYSTEM`、`EVAL_IMAGE_SYSTEM`、
-  `EVAL_VIDEO_SYSTEM` 定义在 `agent/prompts.py` 里但零处引用——质检实际走的是
-  `evaluators.py` 的像素测量，字幕切分是 `split_subtitle()` 的代码逻辑。
-  已删除，避免后来者误以为这些能力已由 LLM 实现。
-
-仍然存在：
-
-- ~~TTS 仍是静音轨~~ **已解决（2026-10-30 第三轮）**：Seed-Audio 1.0 已接入。
-  它跑在豆包语音这条独立产品线上（`openspeech.bytedance.com/api/v3/tts/create`），
-  鉴权是 `X-Api-Key`，与方舟的 `Authorization: Bearer` 完全不同 —— 方舟 key
-  在这里返回 401 `Invalid X-Api-Key`。请求体用 `text_prompt`（不是 `text`），
-  返回 base64 WAV（40kHz 立体声 pcm_s16le）。
-- **配音时长与镜头时长不匹配**：台词由 LLM 写、时长由分镜定，两者独立。
-  实测一句台词 4.58s 配 3s 镜头，直接合成会截断语音。已加 `fit_audio()`：
-  在 0.85-1.45 倍速内做时间伸缩（保持自然语速），超出则补静音或截断。
-- **没有视觉模型**。当前质检是像素测量 + 文件事实，能抓住崩溃、横屏、
-  闪烁、漂移，但抓不住「脸画歪了」这类语义问题。MLLM 钩子已预留。
-- **单进程后台任务**。`BackgroundTasks` + `asyncio.to_thread`，无任务队列、
-  无主动取消。僵死运行现在能被心跳超时自动回收，但正在跑的生成任务本身
-  仍然无法中断（Seedance 单次渲染 60-90 秒，只能等它返回）。
-- **关键帧回灌已实现（图像侧），视频侧受模型限制**。
-  Seedream 4.0 接受 `image` 参数做参考图条件，首镜关键帧现在会作为锚点传给
-  第二镜及之后的所有镜头（`IMAGE_REFERENCE=1`，默认开启）。实测同一部两镜短剧：
-  色彩一致性 0.92 → 0.98，主体一致性 0.46 → 0.56。
-  视频侧无法回灌：官方文档明确 Seedance 1.0 pro / pro-fast 只支持
-  「图生视频-首帧」和「文生视频」，`reference_image` 角色是 Seedance 2.0 系列
-  和 2.5 才有的能力。要在视频侧做锚定，需要开通 2.0 及以上模型。
-- **`scene_consistency` 仍是薄弱维度**：它比较的是整帧结构相似度，
-  而当分镜本身要求换景别换机位时（特写→中景），结构相似度天然低，
-  这个维度对「同一场景不同构图」会误判。它适合检测同一机位下的漂移，
-  不适合做跨景别的场景一致性判断。
-- **字幕仍只覆盖台词**，没有旁白。片头字卡已实现（`VIDEO_TITLE_CARD=1`，默认开），
-  但它是 ffmpeg 绘制，不经过 LLM。`SUBTITLE_SYSTEM` 提示词在第四轮因零引用已删除。
-- ~~**BGM 未接**~~ **已解决（2026-11-06）**：`BGM_PATH` / `BGM_VOLUME` 已接入
-  `compose_video`，用 `aloop` 循环铺底并与台词音轨 `amix`。同时修掉一个真实截断：
-  原先带 BGM 时 `-shortest` 会把整集裁到 BGM 自身长度（实测 3.80s → 3.23s），
-  现在按已知片段总长显式 `-t` 定长。
-- ~~**转场字段仅元数据**~~ **已解决（2026-11-06）**：分镜的 `transition`
-  现在映射到 `xfade`/`acrossfade`（叠化 0.40s、闪白 0.25s、推黑 0.30s，硬切 0s），
-  重叠是真实时间，字幕时间轴同步重排。`VIDEO_TRANSITIONS=0` 可回到纯硬切。
-
-## 10. 交付状态
-
-**当前版本可直接交付使用**，具备以下能力：
-
-| 能力 | 状态 | 说明 |
-|---|---|---|
-| 剧本 → 设定集 → 分镜 | ✅ 真实 | DeepSeek 全链路，角色外观锚点逐字复用 |
-| 关键帧生成 | ✅ 真实 | Seedream 4.0，1080×1920，支持参考图回灌 |
-| 图像质检与返工 | ✅ 真实 | 文件事实 + 像素测量，LLM 按 issue 修复 |
-| 图生视频 | ✅ 真实 | Seedance 1.0 pro-fast，首帧条件 |
-| 关键帧记忆 | ✅ 真实 | 首镜锚点，跨镜漂移可测量，回灌约束后续生成 |
-| 七维评分 | ✅ 真实 | 像素测量，跨景别维度自动跳过 |
-| 字幕烧录与合成 | ✅ 真实 | ffmpeg + ASS，1080×1920 h264+AAC |
-| 封面生成 | ✅ 真实 | logline 烧录 |
-| 前端展示 | ✅ 真实 | 9:16 播放器、分镜、评分条、项目列表、Agent 日志 |
-| 配音 | ✅ 真实 | Seed-Audio 1.0，豆包语音独立鉴权，自动适配镜头时长 |
-| 视频侧参考图 | ⚠️ 不可用 | Seedance 1.0 不支持 `reference_image`，需 2.0+ |
-
-### 交付检查清单
-
-```bash
-# 1. 环境
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-apt-get install -y ffmpeg fonts-noto-cjk
-cp .env.example .env    # 填 DEEPSEEK_API_KEY / ARK_API_KEY
-
-# 2. 测试
-.venv/bin/python -m pytest tests -q          # 应 28 passed
-
-# 3. 免费验证 provider 可用性（不花钱）
-.venv/bin/python scripts/ark_smoke.py --kind status
-
-# 4. 单次最小付费验证
-ARK_ALLOW_PAID=1 .venv/bin/python scripts/ark_smoke.py --kind image
-
-# 5. 启动
-.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
-cd frontend && npm install && npm run dev
-```
-
-### 一次真实生成的成本量级
-
-2 镜短剧：2 次 Seedream（各 8.1k output tokens）+ 2 次 Seedance
-（合计约 69k tokens），耗时约 200 秒。3 镜约 199 秒 / 3+3 次调用。
-
-## 11. 后续路线
-
-1. **视频侧参考图**：开通 Seedance 2.0+，把锚点关键帧作为 `reference_image`
-   传给视频模型，这是压制视频段人物漂移的唯一手段（1.0 不支持）。
-2. **多角色音色**：现在所有台词用同一音色朗读。按角色的 `voice` 字段
-   选择不同音色，需要先拿到可用音色 ID 列表。
-3. **视觉评审**：接视觉模型填 `mllm_judge`，让「脸画歪」这类语义问题进入返工。
-4. **首尾帧约束**：相邻镜头用上一镜末帧作为下一镜首帧，进一步压制跳变。
-5. **可取消执行器**：替换 `BackgroundTasks`，支持中断与重启恢复。
-6. **BGM 与转场**：`compose_video` 的混音能力已就绪，需要调用方与转场实现。
+1. **视频侧参考图**：开通 Seedance 2.0+，把锚点关键帧作为 `reference_image` 传给视频模型，压制视频段的人物漂移。
+2. **多角色音色**：现在所有台词用同一音色。按角色的 `voice` 字段选择不同音色，需要先拿到可用音色 ID 列表。
+3. **首尾帧约束**：相邻镜头用上一镜末帧作为下一镜首帧。
+4. **可取消执行器**：替换 `BackgroundTasks`，支持中断与重启恢复。
+5. **序列级视觉质检**：MLLM 看跨镜序列而非单镜关键帧，捕捉镜头间的语义断层。
