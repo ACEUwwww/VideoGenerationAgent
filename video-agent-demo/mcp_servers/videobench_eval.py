@@ -119,7 +119,12 @@ def evaluate_clip(
     judge_reason = ""
     judge_error = ""
     if mllm_judge and keyframe_path is not None:
-        scores, reason = mllm_judge(keyframe_path, dimension_prompt(MLLM_DIMENSIONS, shot))
+        # The judge is an optional paid call. A network failure must degrade to
+        # the measured path, not abort a run that already paid for the renders.
+        try:
+            scores, reason = mllm_judge(keyframe_path, dimension_prompt(MLLM_DIMENSIONS, shot))
+        except Exception as exc:  # noqa: BLE001 - any judge failure is non-fatal
+            scores, reason = {}, f"vision judge failed: {type(exc).__name__}: {str(exc)[:160]}"
         for name, value in (scores or {}).items():
             if name in MLLM_DIMENSIONS:
                 try:

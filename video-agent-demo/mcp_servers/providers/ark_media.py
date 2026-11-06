@@ -201,6 +201,10 @@ class ArkVisionJudge:
 
     name = "ark"
 
+    def __call__(self, image_path: Path, prompt: str) -> tuple[dict[str, int], str]:
+        """Callable so the instance itself satisfies the mllm_judge hook."""
+        return self.judge(image_path, prompt)
+
     def judge(self, image_path: Path, prompt: str) -> tuple[dict[str, int], str]:
         base_url, api_key, model = _credentials("vision")
         payload = {
@@ -211,7 +215,10 @@ class ArkVisionJudge:
                     "content": [
                         {
                             "type": "image_url",
-                            "image_url": {"url": _data_uri(Path(image_path)), "detail": "high"},
+                            # JPEG re-encode keeps the payload small enough to
+                            # survive the connection; a 1080x1920 PNG is ~500KB
+                            # before base64 and the server drops it mid-request.
+                            "image_url": {"url": _image_uri(Path(image_path)), "detail": "high"},
                         },
                         {"type": "text", "text": prompt},
                     ],
@@ -234,6 +241,25 @@ class ArkVisionJudge:
             if key in data
         }
         return scores, str(data.get("reason", ""))[:400]
+
+
+def _image_uri(path: Path, quality: int = 90) -> str:
+    """JPEG data URI for the vision judge.
+
+    Base64 inflates the payload by ~33%; a full-resolution PNG of a live-action
+    keyframe reaches 500KB and more, which the endpoint drops as
+    ``RemoteProtocolError``. JPEG q90 at the same pixel dimensions is ~1/5 the
+    size and the model sees the same detail.
+    """
+    import io
+
+    from PIL import Image
+
+    image = Image.open(path).convert("RGB")
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=quality)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/jpeg;base64,{encoded}"
 
 
 def _data_uri(path: Path) -> str:
