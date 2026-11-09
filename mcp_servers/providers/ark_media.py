@@ -249,29 +249,33 @@ class ArkVisionJudge:
 
     name = "ark"
 
-    def __call__(self, image_path: Path, prompt: str) -> tuple[dict[str, int], str]:
-        """Callable so the instance itself satisfies the mllm_judge hook."""
+    def __call__(self, image_path, prompt: str) -> tuple[dict[str, int], str]:
+        """Callable so the instance itself satisfies the mllm_judge hook.
+
+        Accepts either one path (per-clip judging) or a list of paths in
+        playback order (sequence judging).
+        """
         return self.judge(image_path, prompt)
 
-    def judge(self, image_path: Path, prompt: str) -> tuple[dict[str, int], str]:
+    def judge(self, image_path, prompt: str) -> tuple[dict[str, int], str]:
         base_url, api_key, model = _credentials("vision")
+        paths = [image_path] if isinstance(image_path, (str, Path)) else list(image_path)
+        if not paths:
+            raise ValueError("vision judge needs at least one image")
+        content = [
+            {
+                "type": "image_url",
+                # JPEG re-encode keeps the payload small enough to survive the
+                # connection; a 1080x1920 PNG is ~500KB before base64 and the
+                # server drops it mid-request.
+                "image_url": {"url": _image_uri(Path(path)), "detail": "high"},
+            }
+            for path in paths
+        ]
+        content.append({"type": "text", "text": prompt})
         payload = {
             "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            # JPEG re-encode keeps the payload small enough to
-                            # survive the connection; a 1080x1920 PNG is ~500KB
-                            # before base64 and the server drops it mid-request.
-                            "image_url": {"url": _image_uri(Path(image_path)), "detail": "high"},
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+            "messages": [{"role": "user", "content": content}],
             "max_tokens": 600,
             "temperature": 0.2,
         }
@@ -283,10 +287,14 @@ class ArkVisionJudge:
         )
         text = body["choices"][0]["message"]["content"]
         data = parse_json(text)
+        # Return every numeric 1-5 score the model produced. The per-clip
+        # prompt asks for four dimensions and the sequence prompt for three
+        # different ones; filtering to a fixed list silently dropped the
+        # sequence scores and made the judge look like it failed.
         scores = {
-            key: data[key]
-            for key in ("imaging_quality", "aesthetic_quality", "motion_effects", "object_consistency")
-            if key in data
+            key: value
+            for key, value in data.items()
+            if key != "reason" and isinstance(value, (int, float))
         }
         return scores, str(data.get("reason", ""))[:400]
 
