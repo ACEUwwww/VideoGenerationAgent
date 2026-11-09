@@ -45,7 +45,7 @@ class OpenAICompatibleClient:
     def __init__(self, settings: LLMSettings, transport: httpx.BaseTransport | None = None) -> None:
         if not settings.api_key:
             raise LLMError(
-                "LLM api key is empty. Set DEEPSEEK_API_KEY in video-agent-demo/.env"
+                "LLM api key is empty. Set DEEPSEEK_API_KEY in .env"
             )
         self.settings = settings
         self._transport = transport
