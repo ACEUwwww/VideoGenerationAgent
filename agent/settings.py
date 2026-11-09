@@ -57,6 +57,10 @@ class MediaSettings:
     ark_video_model: str = ""
     ark_vision_model: str = ""
     ark_video_resolution: str = "720p"
+    kling_base_url: str = ""
+    kling_api_key: str = ""
+    kling_model: str = ""
+    kling_mode: str = "std"
     image_reference: bool = True
     image_retries: int = 1
     video_retries: int = 1
@@ -119,6 +123,10 @@ def load_settings() -> Settings:
         ark_video_model=_env("ARK_VIDEO_MODEL", "doubao-seedance-1-0-pro-fast-251015"),
         ark_vision_model=_env("ARK_VISION_MODEL", "doubao-seed-2-1-pro-260915"),
         ark_video_resolution=_env("ARK_VIDEO_RESOLUTION", "720p"),
+        kling_base_url=_env("KLING_BASE_URL"),
+        kling_api_key=_env("KLING_API_KEY"),
+        kling_model=_env("KLING_MODEL", "kling-v2-1"),
+        kling_mode=_env("KLING_MODE", "std"),
         image_reference=_env("IMAGE_REFERENCE", "1") not in ("0", "false", "False"),
         image_retries=int(_env("IMAGE_RETRIES", "1")),
         video_retries=int(_env("VIDEO_RETRIES", "1")),
@@ -145,6 +153,14 @@ def get_settings() -> Settings:
 
 
 def reset_settings() -> None:
-    """Tests and the runner call this after changing environment variables."""
+    """Tests and the runner call this after changing environment variables.
+
+    Provider instances are cached too; clearing only the settings leaves a
+    stale provider selected, so a reconfigured run would silently keep using
+    the previous vendor.
+    """
     global _SETTINGS
     _SETTINGS = None
+    from mcp_servers.providers import reset_provider_cache
+
+    reset_provider_cache()

@@ -21,6 +21,7 @@ from mcp_servers.providers.base import (
 )
 from mcp_servers.providers.ark_media import ArkImageProvider, ArkVideoProvider, ArkVisionJudge
 from mcp_servers.providers.doubao_speech import DoubaoSpeechProvider
+from mcp_servers.providers.kling_media import KlingVideoProvider
 from mcp_servers.providers.mock_media import (
     MockImageProvider,
     MockSpeechProvider,
@@ -52,6 +53,8 @@ def get_video_provider() -> VideoProvider:
         return MockVideoProvider()
     if name == "ark":
         return ArkVideoProvider()
+    if name == "kling":
+        return KlingVideoProvider()
     raise ProviderConfigError(
         f"VIDEO_PROVIDER={name!r} has no implementation yet. "
         "Add a class in mcp_servers/providers/ and register it here."
@@ -85,6 +88,14 @@ def get_vision_judge():
     return ArkVisionJudge()
 
 
+def reset_provider_cache() -> None:
+    """Drop cached provider instances after a configuration change."""
+    for cached in (get_image_provider, get_video_provider, get_speech_provider, get_vision_judge):
+        cache_clear = getattr(cached, "cache_clear", None)
+        if cache_clear is not None:
+            cache_clear()
+
+
 def provider_report() -> dict[str, str]:
     media = get_settings().media
     return {
@@ -109,4 +120,5 @@ __all__ = [
     "get_video_provider",
     "get_vision_judge",
     "provider_report",
+    "reset_provider_cache",
 ]

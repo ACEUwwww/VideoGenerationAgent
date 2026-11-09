@@ -103,3 +103,53 @@ def test_claim_run_is_atomic(project_root):
     for thread in threads:
         thread.join()
     assert sum(results) == 1
+
+
+def test_kling_is_registered_and_gated(monkeypatch):
+    """Kling must be selectable, and must refuse to spend money unless the
+    paid gate is explicitly opened — same contract as the Ark providers."""
+    import agent.settings as settings_mod
+    from mcp_servers.providers import ProviderConfigError, get_video_provider
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "kling")
+    monkeypatch.setenv("KLING_API_KEY", "test-key")
+    monkeypatch.setenv("KLING_BASE_URL", "https://example.invalid")
+    monkeypatch.delenv("KLING_ALLOW_PAID", raising=False)
+    settings_mod.reset_settings()
+
+    provider = get_video_provider()
+    assert type(provider).__name__ == "KlingVideoProvider"
+
+    from pathlib import Path
+
+    from mcp_servers.providers.base import VideoRequest
+
+    request = VideoRequest(
+        image_path=Path("/nonexistent.png"),
+        motion_prompt="slow push in",
+        shot_id="shot_001",
+        project_dir=Path("/tmp"),
+        duration_s=5,
+        width=1080,
+        height=1920,
+        fps=30,
+    )
+    import pytest
+
+    with pytest.raises(RuntimeError, match="KLING_ALLOW_PAID"):
+        provider.generate(request)
+
+    settings_mod.reset_settings()
+
+
+def test_kling_rejects_an_unknown_provider_name(monkeypatch):
+    import agent.settings as settings_mod
+    from mcp_servers.providers import ProviderConfigError, get_video_provider
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "not-a-vendor")
+    settings_mod.reset_settings()
+    import pytest
+
+    with pytest.raises(ProviderConfigError):
+        get_video_provider()
+    settings_mod.reset_settings()

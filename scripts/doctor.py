@@ -78,11 +78,17 @@ def check_config() -> list[str]:
     ):
         if provider == "mock":
             _line(OK, kind, "mock（本地渲染，零成本）")
+        elif kind == "video" and provider == "kling":
+            if media.kling_api_key and media.kling_base_url:
+                _line(OK, kind, f"kling / {media.kling_model} @ {media.kling_base_url}")
+            else:
+                problems.append("VIDEO_PROVIDER 是 kling 但 KLING_API_KEY / KLING_BASE_URL 为空")
+                _line(FAIL, kind, "kling 已选但凭据或端点为空")
         elif key:
             _line(OK, kind, f"ark / {media.ark_image_model if kind == 'image' else media.ark_video_model}")
         else:
-            problems.append(f"{kind} provider 是 ark 但 ARK_API_KEY 为空")
-            _line(FAIL, kind, "ark 已选但 ARK_API_KEY 为空")
+            problems.append(f"{kind} provider 是 {provider} 但 ARK_API_KEY 为空")
+            _line(FAIL, kind, f"{provider} 已选但 ARK_API_KEY 为空")
 
     if media.tts_provider == "mock":
         _line(OK, "tts", "mock（静音轨）")
@@ -97,6 +103,8 @@ def check_config() -> list[str]:
     paid = media.image_provider == "ark" or media.video_provider == "ark"
     if paid:
         print("\n  注意：已选择付费 provider，真实调用需要 ARK_ALLOW_PAID=1")
+    if media.video_provider == "kling":
+        print("  注意：Kling 是付费 provider，真实调用需要 KLING_ALLOW_PAID=1")
     return problems
 
 
