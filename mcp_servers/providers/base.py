@@ -39,6 +39,11 @@ class VideoRequest:
     fps: int
     seed: int = 0
     caption: str = ""
+    # Last frame of the previous shot. When the model supports first/last-frame
+    # generation, passing it makes this clip end exactly where the next begins,
+    # which removes the visual jump at the cut. Only Seedance 2.x / 1.0 pro
+    # accept it; 1.0 pro-fast does not.
+    last_frame_path: Path | None = None
 
 
 @dataclass

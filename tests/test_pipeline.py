@@ -249,3 +249,72 @@ def test_vision_judge_is_absent_without_paid_gate(monkeypatch):
 
     settings_mod.reset_settings()
     assert get_vision_judge() is None
+
+
+def test_last_frame_capability_is_model_gated():
+    """Seeding last_frame into a pro-fast task is rejected by the API, so the
+    capability check must be explicit rather than assumed."""
+    from mcp_servers.providers.ark_media import supports_last_frame
+
+    assert supports_last_frame("doubao-seedance-1-0-pro-fast-251015") is False
+    assert supports_last_frame("doubao-seedance-1-0-pro-250528") is True
+    assert supports_last_frame("doubao-seedance-2-0-260128") is True
+    assert supports_last_frame("doubao-seedance-2-5-260628") is True
+
+
+def test_extract_last_frame_reads_a_real_clip(tmp_path):
+    """Chaining needs the tail frame of the previous clip, not its opening."""
+    import subprocess as sp
+
+    from mcp_servers.keyframe_memory import extract_last_frame
+
+    clip = tmp_path / "clip.mp4"
+    sp.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0x334455:s=320x568:d=2:r=30",
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(clip)],
+        capture_output=True, check=True,
+    )
+    out = extract_last_frame(clip, tmp_path / "last.png")
+    assert out.exists() and out.stat().st_size > 1000
+
+
+def test_sequence_judge_scores_the_ordered_keyframes(tmp_path):
+    """Per-clip scoring cannot see cross-shot contradictions; the sequence
+    judge must receive every keyframe in playback order in one call."""
+    from mcp_servers.videobench_eval import SEQUENCE_DIMENSIONS, evaluate_sequence
+
+    frames = []
+    for index in range(3):
+        frame = tmp_path / f"k{index}.png"
+        frame.write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(64))
+        frames.append(frame)
+
+    shots = [
+        {"shot_size": "特写", "description": "他推开门", "dialogue": "有人吗？"},
+        {"shot_size": "中景", "description": "街上没人", "dialogue": "怎么都一样"},
+        {"shot_size": "全景", "description": "集市出现", "dialogue": "有人！"},
+    ]
+
+    seen: list[list[str]] = []
+
+    def judge(paths, prompt):
+        seen.append([str(p) for p in paths])
+        assert "story_coherence" in prompt and "continuity" in prompt and "pacing" in prompt
+        return {"story_coherence": 4, "continuity": 3, "pacing": 5, "reason": "闭环成立"}, "闭环成立"
+
+    result = evaluate_sequence(frames, shots, mllm_judge=judge)
+
+    assert len(seen) == 1, f"expected one sequence call, got {len(seen)}"
+    assert seen[0] == [str(p) for p in frames], "keyframes must arrive in playback order"
+    assert set(result["dimensions"]) == set(SEQUENCE_DIMENSIONS)
+    assert result["dimensions"]["pacing"]["score_1to5"] == 5
+    assert result["score"] is not None
+
+
+def test_sequence_judge_absent_without_a_judge():
+    """No vision judge must report unconfigured, not fabricate a score."""
+    from mcp_servers.videobench_eval import evaluate_sequence
+
+    result = evaluate_sequence([], [], mllm_judge=None)
+    assert result["configured"] is False
+    assert result["score"] is None

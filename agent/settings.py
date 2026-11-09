@@ -65,6 +65,9 @@ class MediaSettings:
     fps: int = 30
     transitions: bool = True
     title_card: bool = True
+    # Chain each clip's last frame into the next clip as its last_frame role.
+    # Requires a model that accepts last_frame (Seedance 2.x or 1.0 pro).
+    first_last_frame: bool = True
     bgm_path: str = ""
     bgm_volume: float = 0.18
     @property
@@ -123,6 +126,7 @@ def load_settings() -> Settings:
         height=int(_env("VIDEO_HEIGHT", "1920")),
         fps=int(_env("VIDEO_FPS", "30")),
         transitions=_env("VIDEO_TRANSITIONS", "1") not in ("0", "false", "False"),
+        first_last_frame=_env("VIDEO_FIRST_LAST_FRAME", "1") not in ("0", "false", "False"),
         title_card=_env("VIDEO_TITLE_CARD", "1") not in ("0", "false", "False"),
         bgm_path=_env("BGM_PATH", ""),
         bgm_volume=float(_env("BGM_VOLUME", "0.18")),

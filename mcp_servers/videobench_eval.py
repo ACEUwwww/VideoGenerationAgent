@@ -179,6 +179,111 @@ def evaluate_clip(
     }
 
 
+SEQUENCE_DIMENSIONS = (
+    "story_coherence",
+    "continuity",
+    "pacing",
+)
+
+
+def sequence_prompt(shots: list[dict]) -> str:
+    """One judging prompt over the whole shot sequence.
+
+    Per-shot judging cannot see whether shot 4 contradicts shot 2, whether the
+    story lands, or whether the pacing collapses. Those are properties of the
+    ordered sequence, so they need the frames together in one call.
+    """
+    lines = [
+        "你是竖屏短剧的剪辑审片人。下面是同一部短片的全部分镜关键帧，按播放顺序排列。",
+        "",
+        "请评估三个序列级维度，各按 1-5 分打分（5 最好）：",
+        "- story_coherence: 这些镜头连起来是否讲清了一个故事？观众能否说出「谁想要什么、",
+        "  什么阻挡了他、最后怎样了」。镜头之间没有因果、只是氛围堆砌即为低分。",
+        "- continuity: 跨镜头的连续性。人物长相、服装、色调、场景是否一致；",
+        "  有没有前后矛盾的细节（比如物件凭空出现或消失、衣服颜色跳变）。",
+        "- pacing: 节奏。是否有铺垫、推进、收束；有没有连续多镜停滞不前。",
+        "",
+        "分镜列表：",
+    ]
+    for index, shot in enumerate(shots, start=1):
+        lines.append(
+            f"{index}. [{shot.get('shot_size', '')}] {shot.get('description') or shot.get('action', '')}"
+            f" | 台词：{shot.get('dialogue') or '（无）'}"
+        )
+    lines += [
+        "",
+        "只输出 JSON，每个维度一个 1-5 的整数分数，另给一句理由：",
+        '{"story_coherence": 4, "continuity": 4, "pacing": 3, "reason": "..."}',
+    ]
+    return "\n".join(lines)
+
+
+def evaluate_sequence(
+    keyframes: list,
+    shots: list[dict],
+    mllm_judge=None,
+) -> dict:
+    """Sequence-level MLLM judgement over the ordered keyframes.
+
+    ``keyframes`` is the list of keyframe image paths in playback order.
+    Returns ``{dimensions, score, reason}``; when no judge is configured it
+    returns ``configured=False`` so the caller can fall back to the per-clip
+    aggregate rather than inventing a number.
+    """
+    if mllm_judge is None or not keyframes:
+        return {
+            "configured": False,
+            "dimensions": {},
+            "score": None,
+            "reason": "no vision judge configured",
+        }
+    usable = [path for path in keyframes if path]
+    if not usable:
+        return {
+            "configured": True,
+            "dimensions": {},
+            "score": None,
+            "reason": "no keyframes available",
+        }
+    try:
+        scores, reason = mllm_judge(
+            usable,
+            sequence_prompt([shots[i] for i in range(len(usable))] if len(usable) <= len(shots) else shots),
+        )
+    except Exception as exc:  # noqa: BLE001 - a judge outage must not fail a finished episode
+        return {
+            "configured": True,
+            "dimensions": {},
+            "score": None,
+            "reason": f"sequence judge failed: {type(exc).__name__}: {str(exc)[:160]}",
+        }
+
+    dimensions = {}
+    for name in SEQUENCE_DIMENSIONS:
+        value = (scores or {}).get(name)
+        try:
+            score = int(value)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= score <= 5:
+            dimensions[name] = {"score_1to5": score, "score": round((score - 1) / 4, 3)}
+    if not dimensions:
+        return {
+            "configured": True,
+            "dimensions": {},
+            "score": None,
+            "reason": reason or "sequence judge returned no usable scores",
+        }
+    overall = round(float(np.mean([d["score"] for d in dimensions.values()])), 3)
+    return {
+        "configured": True,
+        "dimensions": dimensions,
+        "score": overall,
+        "reason": reason or "",
+        "frames": len(usable),
+    }
+
+
 def evaluate_episode(clips: list[dict]) -> dict:
     """Aggregate per-clip reports into an episode-level table."""
     if not clips:

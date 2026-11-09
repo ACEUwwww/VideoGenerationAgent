@@ -81,9 +81,13 @@ def generate_video(
     duration_s: float,
     caption: str = "",
     seed: int = 0,
+    last_frame_path: str = "",
 ) -> dict:
     media = get_settings().media
     root = ensure_project_dirs(project_id)
+    last_frame = root / last_frame_path if last_frame_path else None
+    if last_frame is not None and not last_frame.exists():
+        last_frame = None
     request = VideoRequest(
         image_path=root / image_path,
         motion_prompt=motion_prompt,
@@ -95,6 +99,7 @@ def generate_video(
         fps=media.fps,
         seed=seed,
         caption=caption,
+        last_frame_path=last_frame,
     )
     result = get_video_provider().generate(request)
     _write_meta(root / "videos" / f"{shot_id}.json", result)

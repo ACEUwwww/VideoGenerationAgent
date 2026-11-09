@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from agent.state import AgentState, add_event, persist
 from mcp_servers import video_tools_server as tools
-from mcp_servers.videobench_eval import evaluate_episode
+from mcp_servers.providers import get_vision_judge
+from mcp_servers.videobench_eval import evaluate_episode, evaluate_sequence
 
 
 def compose_video(state: AgentState) -> AgentState:
@@ -47,6 +48,28 @@ def compose_video(state: AgentState) -> AgentState:
             for shot in shots
         ]
     )
+    # Sequence-level judgement: per-clip scoring cannot see whether the cuts
+    # contradict each other, whether the story lands, or whether the pacing
+    # collapses. That needs the ordered keyframes together in one vision call.
+    root = tools.ensure_project_dirs(state["project_id"])
+    keyframes = [
+        root / shot["keyframe_path"]
+        for shot in shots
+        if shot.get("keyframe_path") and (root / shot["keyframe_path"]).exists()
+    ]
+    sequence = evaluate_sequence(keyframes, shots, mllm_judge=get_vision_judge())
+    report["sequence"] = sequence
+    if sequence.get("score") is not None:
+        add_event(
+            state,
+            "Observation",
+            f"序列级质检：{sequence['score']:.2f}。",
+            {"dimensions": {k: v["score_1to5"] for k, v in sequence["dimensions"].items()},
+             "reason": sequence.get("reason", "")},
+        )
+    else:
+        add_event(state, "Observation", f"序列级质检未执行：{sequence.get('reason', '')}")
+
     state["episode_report"] = report
     add_event(state, "Observation", f"全片多维评分：{report['score']:.2f}。", report["dimensions"])
 

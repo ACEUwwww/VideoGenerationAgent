@@ -31,6 +31,20 @@ DOWNLOAD_ATTEMPTS = 4
 RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 
 
+# Seedance 1.0 pro-fast only supports text-to-video and first-frame
+# image-to-video; last_frame reached the API with 2.0 and also exists on
+# 1.0 pro. Matching on the model id keeps this honest when .env is switched.
+_LAST_FRAME_PATTERNS = ("seedance-2", "seedance-1-0-pro-2")
+
+
+def supports_last_frame(model: str) -> bool:
+    """Whether this Seedance model accepts a ``last_frame`` role."""
+    name = (model or "").lower()
+    if "pro-fast" in name:
+        return False
+    return any(pattern in name for pattern in _LAST_FRAME_PATTERNS)
+
+
 def _post_with_retry(url: str, headers: dict, payload: dict, *, timeout: float, attempts: int = CREATE_ATTEMPTS) -> dict:
     """POST with bounded retry on connection errors and transient statuses."""
     last = ""
@@ -134,12 +148,25 @@ class ArkVideoProvider:
     def generate(self, request: VideoRequest) -> dict:
         base_url, api_key, model = _credentials("video")
         image_uri = _data_uri(request.image_path)
+        content = [
+            {"type": "text", "text": request.motion_prompt},
+            {"type": "image_url", "image_url": {"url": image_uri}, "role": "first_frame"},
+        ]
+        # First/last-frame chaining pins this clip's ending to the next clip's
+        # opening, so the cut does not jump. pro-fast does not accept
+        # last_frame at all, and mixing roles across scenarios is rejected, so
+        # the flag only appears when the model is known to support it.
+        if request.last_frame_path is not None and supports_last_frame(model):
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": _data_uri(Path(request.last_frame_path))},
+                    "role": "last_frame",
+                }
+            )
         payload = {
             "model": model,
-            "content": [
-                {"type": "text", "text": request.motion_prompt},
-                {"type": "image_url", "image_url": {"url": image_uri}, "role": "first_frame"},
-            ],
+            "content": content,
             "ratio": "9:16",
             "resolution": get_settings().media.ark_video_resolution,
             "duration": int(round(request.duration_s)),

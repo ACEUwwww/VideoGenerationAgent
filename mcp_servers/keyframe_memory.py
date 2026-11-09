@@ -23,6 +23,29 @@ def extract_keyframe(video_path: Path, target: Path, at_s: float = 0.15) -> Path
     return target
 
 
+def extract_last_frame(video_path: Path, target: Path, back_s: float = 0.1) -> Path:
+    """Last usable frame of a clip, for first/last-frame chaining.
+
+    Seeking from the end rather than the start: the final frame can be a
+    partially decoded frame on some encoders, so backing off a fraction of a
+    second gives a clean one.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    duration = 0.0
+    try:
+        from mcp_servers.providers.ffmpeg_utils import media_facts
+
+        duration = float(media_facts(video_path).get("duration_s", 0.0) or 0.0)
+    except Exception:
+        duration = 0.0
+    seek = max(duration - back_s, 0.0)
+    run([
+        ffmpeg_bin(), "-y", "-ss", f"{seek:.3f}", "-i", str(video_path),
+        "-frames:v", "1", "-update", "1", str(target),
+    ])
+    return target
+
+
 def load_reference(path: Path) -> np.ndarray:
     data = np.asarray(Image.open(path).convert("RGB").resize((192, 342), Image.BILINEAR), dtype=np.float32)
     return data

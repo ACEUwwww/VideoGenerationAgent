@@ -42,14 +42,37 @@ def generate_video_prompt(state: AgentState) -> AgentState:
     )
 
 
+def _previous_tail_frame(state: AgentState, shot: dict) -> str:
+    """Last frame of the preceding shot, or "" when there is nothing to chain.
+
+    Chaining clips this way removes the jump at the cut: the next clip starts
+    from (approximately) where the previous one ended instead of from a
+    freshly drawn keyframe.
+    """
+    if not get_settings().media.first_last_frame:
+        return ""
+    index = shot.get("index", 0)
+    if index <= 0:
+        return ""
+    previous = state["shots"][index - 1]
+    if not previous.get("video_path"):
+        return ""
+    root = tools.ensure_project_dirs(state["project_id"])
+    target = root / "keyframes" / f"{previous['id']}_last.png"
+    keyframe_memory.extract_last_frame(root / previous["video_path"], target)
+    return str(target.relative_to(root))
+
+
 def call_generate_video(state: AgentState) -> AgentState:
     shot = current_shot(state)
     media = get_settings().media
+    last_frame = _previous_tail_frame(state, shot)
     add_event(
         state,
         "Action",
         "MCP.generate_video",
-        {"shot_id": shot["id"], "provider": media.video_provider, "duration_s": shot["duration_s"]},
+        {"shot_id": shot["id"], "provider": media.video_provider, "duration_s": shot["duration_s"],
+         "last_frame": last_frame or "none"},
     )
     result = tools.generate_video(
         shot["image_path"],
@@ -59,6 +82,7 @@ def call_generate_video(state: AgentState) -> AgentState:
         duration_s=shot["duration_s"],
         caption=shot.get("description", ""),
         seed=shot["index"] + 1,
+        last_frame_path=last_frame,
     )
     if media.video_provider != "mock":
         track_media_usage(state, "generate_video", media.video_provider, result.get("usage"))
