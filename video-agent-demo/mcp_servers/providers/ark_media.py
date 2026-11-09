@@ -25,6 +25,9 @@ VIDEO_TIMEOUT_S = 900.0
 # A create call is the money-spending step: retry only what cannot be billed
 # twice (connection errors, 429, 5xx). A 4xx business error is raised at once.
 CREATE_ATTEMPTS = 3
+# The render result CDN drops TLS mid-transfer; retrying the download costs
+# nothing extra because the task is already billed and finished.
+DOWNLOAD_ATTEMPTS = 4
 RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 
 
@@ -173,7 +176,25 @@ class ArkVideoProvider:
                     f"Ark video task {task_id} timed out after {VIDEO_TIMEOUT_S}s (last poll error: {last_poll_error or 'none'})"
                 )
 
-            raw = client.get(video_url, timeout=600).content
+            # The CDN drops TLS connections mid-transfer often enough that a
+            # single GET loses a render that has already been paid for. Retry
+            # the download only; the task itself succeeded and is not re-billed.
+            raw = b""
+            last_download_error = ""
+            for attempt in range(DOWNLOAD_ATTEMPTS):
+                try:
+                    raw = client.get(video_url, timeout=600).content
+                    if raw:
+                        break
+                except httpx.HTTPError as exc:
+                    last_download_error = f"{type(exc).__name__}: {exc}"
+                    time.sleep(2**attempt)
+            if not raw:
+                raise RuntimeError(
+                    f"Ark video {task_id} finished but download failed after "
+                    f"{DOWNLOAD_ATTEMPTS} attempts ({last_download_error or 'empty body'}); "
+                    f"url={video_url}"
+                )
         usage = body.get("usage", {})
 
         target = request.project_dir / "videos" / f"{request.shot_id}.mp4"
