@@ -318,3 +318,54 @@ def test_sequence_judge_absent_without_a_judge():
     result = evaluate_sequence([], [], mllm_judge=None)
     assert result["configured"] is False
     assert result["score"] is None
+
+
+def test_last_frame_comes_from_the_next_keyframe(project):
+    """Shot N runs keyframe[N] -> keyframe[N+1].
+
+    Using the previous clip's tail frame would make every clip evolve towards
+    the picture that already played, which is the opposite of splicing. The
+    chain must therefore be forward-looking: the next shot's keyframe, which
+    its own clip then starts from.
+    """
+    project_id, state = project
+    final = run_agent(state)
+    shots = final["shots"]
+    assert len(shots) >= 2
+
+    root = project_store.project_dir(project_id)
+    for shot in shots[:-1]:
+        following = shots[shot["index"] + 1]
+        assert following["image_path"], "the next keyframe must already exist"
+        assert (root / following["image_path"]).exists()
+
+    # The last shot has no successor to land on.
+    last = shots[-1]
+    payload = (root / "videos" / f"{last['id']}.json").read_text(encoding="utf-8")
+    assert "last_frame_path" not in payload or not payload["last_frame_path"]
+
+
+def test_image_phase_finishes_before_any_clip_is_rendered(project):
+    """Every keyframe must exist before shot 1 renders.
+
+    Interleaving the phases would mean keyframe[N+1] does not exist yet when
+    shot N asks for it as a final frame, and the chain silently degrades to
+    first-frame-only generation.
+    """
+    import json as _json
+
+    project_id, state = project
+    final = run_agent(state)
+    root = project_store.project_dir(project_id)
+
+    events = [
+        _json.loads(line)
+        for line in (root / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    # Tool calls land as (type="Action", message="MCP.<tool>").
+    kinds = [event.get("message") for event in events]
+    first_video = kinds.index("MCP.generate_video")
+    image_actions = [i for i, kind in enumerate(kinds) if kind == "MCP.generate_image"]
+    assert image_actions, "image phase should have run"
+    assert max(image_actions) < first_video, "all keyframes must precede the first clip"

@@ -20,6 +20,7 @@ from mcp_servers import keyframe_memory
 from mcp_servers import video_tools_server as tools
 from mcp_servers.evaluators import evaluate_video as qa_video
 from mcp_servers.providers import get_vision_judge
+from mcp_servers.providers.ark_media import supports_last_frame
 from mcp_servers.videobench_eval import evaluate_clip
 
 
@@ -27,10 +28,19 @@ def generate_video_prompt(state: AgentState) -> AgentState:
     shot = current_shot(state)
     add_event(state, "Thought", f"为 {shot['id']} 设计运动提示词。")
     llm = get_llm()
+    following = (state.get("shots") or [])[shot.get("index", 0) + 1 : shot.get("index", 0) + 2]
+    ending = ""
+    if following:
+        nxt = following[0]
+        ending = (
+            f"\n结束帧（本镜必须在这里收尾）：{nxt.get('shot_size', '')} · {nxt.get('scene', '')} · "
+            f"{nxt.get('description', '')}"
+        )
     request = (
         f"分镜：{json.dumps(shot, ensure_ascii=False)}\n"
         f"关键帧提示词：{shot.get('image_prompt', '')}\n"
-        f"时长：{shot['duration_s']} 秒\n"
+        f"时长：{shot['duration_s']} 秒"
+        f"{ending}\n"
         f"整体调性：{state.get('tone', '')}"
     )
     data, reply = llm.generate_json(MOTION_PROMPT_SYSTEM, request, required_keys=("motion_prompt",))
@@ -42,31 +52,34 @@ def generate_video_prompt(state: AgentState) -> AgentState:
     )
 
 
-def _previous_tail_frame(state: AgentState, shot: dict) -> str:
-    """Last frame of the preceding shot, or "" when there is nothing to chain.
+def _next_keyframe(state: AgentState, shot: dict) -> str:
+    """Keyframe of the following shot, served as this clip's final frame.
 
-    Chaining clips this way removes the jump at the cut: the next clip starts
-    from (approximately) where the previous one ended instead of from a
-    freshly drawn keyframe.
+    Shot N runs keyframe[N] -> keyframe[N+1]. Shot N+1 renders from that same
+    image as its first frame, so the cut lands on an identical picture and the
+    two clips splice without a jump. The last shot has nothing to land on and
+    ends free.
+
+    This only works because the image phase finishes every keyframe before the
+    video phase starts; when the clip is rendered, keyframe[N+1] already exists.
     """
     if not get_settings().media.first_last_frame:
         return ""
+    shots = state.get("shots", [])
     index = shot.get("index", 0)
-    if index <= 0:
+    if index + 1 >= len(shots):
         return ""
-    previous = state["shots"][index - 1]
-    if not previous.get("video_path"):
+    following = shots[index + 1]
+    path = following.get("image_path") or ""
+    if not path:
         return ""
-    root = tools.ensure_project_dirs(state["project_id"])
-    target = root / "keyframes" / f"{previous['id']}_last.png"
-    keyframe_memory.extract_last_frame(root / previous["video_path"], target)
-    return str(target.relative_to(root))
+    return path if (tools.ensure_project_dirs(state["project_id"]) / path).exists() else ""
 
 
 def call_generate_video(state: AgentState) -> AgentState:
     shot = current_shot(state)
     media = get_settings().media
-    last_frame = _previous_tail_frame(state, shot)
+    last_frame = _next_keyframe(state, shot)
     add_event(
         state,
         "Action",
@@ -74,6 +87,16 @@ def call_generate_video(state: AgentState) -> AgentState:
         {"shot_id": shot["id"], "provider": media.video_provider, "duration_s": shot["duration_s"],
          "last_frame": last_frame or "none"},
     )
+    # A pro-fast model silently drops last_frame and renders first-frame-only,
+    # which looks exactly like a working run until the cuts visibly jump. Say so
+    # instead of letting the config degrade quietly.
+    if last_frame and media.video_provider == "ark" and not supports_last_frame(media.ark_video_model):
+        add_event(
+            state,
+            "Observation",
+            f"{media.ark_video_model} 不支持首尾帧，本镜只按首帧生成，拼接会跳。改用 1.0 pro 或 2.x。",
+            {"model": media.ark_video_model, "last_frame_dropped": last_frame},
+        )
     result = tools.generate_video(
         shot["image_path"],
         shot["motion_prompt"],
@@ -270,6 +293,36 @@ def split_subtitle(text: str, duration_s: float, max_chars: int = 14) -> list[di
         result.append({"text": line.strip(), "start_s": round(cursor, 2), "end_s": round(cursor + span, 2)})
         cursor += span
     return result
+
+
+def start_video_phase(state: AgentState) -> AgentState:
+    """Rewind the shot cursor once every keyframe exists.
+
+    The image phase runs to completion first so that shot N can be handed
+    keyframe[N+1] as its final frame. Rendering the two phases interleaved would
+    mean keyframe[N+1] did not exist yet when shot N is rendered.
+    """
+    state["current_shot_index"] = 0
+    add_event(
+        state,
+        "Decision",
+        "全部关键帧就绪，进入视频阶段；第 N 镜以 keyframe[N] 起、以 keyframe[N+1] 收。",
+    )
+    return persist(state)
+
+
+def advance_keyframe(state: AgentState) -> AgentState:
+    next_index = state.get("current_shot_index", 0) + 1
+    state["current_shot_index"] = next_index
+    if next_index < len(state.get("shots", [])):
+        add_event(state, "Decision", f"关键帧完成，进入 shot_{next_index + 1:03d}。")
+    else:
+        add_event(state, "Decision", "全部关键帧生成完毕。")
+    return persist(state)
+
+
+def has_more_keyframes(state: AgentState) -> str:
+    return "more" if state.get("current_shot_index", 0) < len(state.get("shots", [])) else "all_done"
 
 
 def advance_shot(state: AgentState) -> AgentState:

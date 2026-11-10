@@ -120,7 +120,9 @@ def load_settings() -> Settings:
         ark_base_url=_env("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3"),
         ark_api_key=_env("ARK_API_KEY"),
         ark_image_model=_env("ARK_IMAGE_MODEL", "doubao-seedream-4-0-250828"),
-        ark_video_model=_env("ARK_VIDEO_MODEL", "doubao-seedance-1-0-pro-fast-251015"),
+        # pro, not pro-fast: pro-fast rejects last_frame, and first/last-frame chaining
+        # is what removes the jump at the cut between shots.
+        ark_video_model=_env("ARK_VIDEO_MODEL", "doubao-seedance-1-0-pro-250528"),
         ark_vision_model=_env("ARK_VISION_MODEL", "doubao-seed-2-1-pro-260915"),
         ark_video_resolution=_env("ARK_VIDEO_RESOLUTION", "720p"),
         kling_base_url=_env("KLING_BASE_URL"),

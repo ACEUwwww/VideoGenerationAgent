@@ -63,19 +63,25 @@ def generate_image_prompt(state: AgentState) -> AgentState:
 
 
 def _anchor_reference(state: AgentState, root, media) -> str:
-    """Path of the keyframe-memory anchor, or "" when there is nothing to anchor to.
+    """Image to condition this keyframe on, or "" when there is nothing yet.
 
-    The first shot has no anchor by definition; it establishes one when its clip
-    is scored. Later shots are conditioned on it so faces, wardrobe and colour
-    grade carry over instead of being re-invented per shot.
+    The keyframe-memory anchor is written during the video phase, so during the
+    image phase (which now runs first and in full) it is always empty. Falling
+    back to the previous shot's accepted keyframe keeps faces, wardrobe and
+    colour grade continuous: shot N is drawn from shot N-1, which is exactly the
+    frame shot N-1's clip ends on.
     """
     if not media.image_reference or media.image_provider == "mock":
         return ""
     entry = keyframe_memory.anchor_entry(root)
-    if not entry:
+    if entry and (root / entry["path"]).exists():
+        return entry["path"]
+    shots = state.get("shots") or []
+    index = state.get("current_shot_index", 0)
+    if index <= 0 or index - 1 >= len(shots):
         return ""
-    path = root / entry["path"]
-    return entry["path"] if path.exists() else ""
+    previous = shots[index - 1].get("image_path") or ""
+    return previous if previous and (root / previous).exists() else ""
 
 
 def call_generate_image(state: AgentState) -> AgentState:
@@ -141,13 +147,13 @@ def call_evaluate_image(state: AgentState) -> AgentState:
 def should_retry_image(state: AgentState) -> str:
     shot = current_shot(state)
     if shot.get("image_mock"):
-        add_event(state, "Decision", f"{shot['id']} 使用 mock 关键帧，返工无法改善，直接进入视频生成。")
-        return "video"
+        add_event(state, "Decision", f"{shot['id']} 使用 mock 关键帧，返工无法改善，继续下一镜。")
+        return "next"
     if shot.get("image_passed"):
-        add_event(state, "Decision", f"{shot['id']} 关键帧通过质检，进入视频生成。")
-        return "video"
+        add_event(state, "Decision", f"{shot['id']} 关键帧通过质检，继续下一镜。")
+        return "next"
     if shot.get("image_retry_count", 0) < get_settings().media.image_retries:
         add_event(state, "Decision", f"{shot['id']} 关键帧未通过，重写提示词后重试。")
         return "retry"
     add_event(state, "Decision", f"{shot['id']} 达到最大重试次数，保留当前关键帧继续。")
-    return "video"
+    return "next"

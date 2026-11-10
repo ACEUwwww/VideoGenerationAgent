@@ -14,7 +14,10 @@ from agent.prompts import BIBLE_SYSTEM, SHOTS_SYSTEM
 from agent.state import AgentState, add_event, persist, track_usage
 from backend.services import project_store
 
-MAX_SHOT_SECONDS = 6.0
+# Seedance 1.0 pro / 2.x render up to 12s in one call. The old 6s cap made a
+# long shot impossible no matter what the prompt asked for: 8 shots over a
+# 32s target can only average 4s, so the shot list came back uniformly 4.0s.
+MAX_SHOT_SECONDS = 12.0
 MIN_SHOT_SECONDS = 3.0
 
 
@@ -42,11 +45,13 @@ def plan_story(state: AgentState) -> AgentState:
 
     characters = data.get("characters") or []
     beats = data.get("beats") or []
-    if beats and len(beats) != state["shot_count"]:
+    # Beats and shots are deliberately not 1:1: one beat can span several shots
+    # and one long take can carry two beats. Only the ordering is binding.
+    if len(beats) > state["shot_count"]:
         add_event(
             state,
             "Observation",
-            f"设定集给了 {len(beats)} 个节拍，与 {state['shot_count']} 镜不符，按镜头数标注。",
+            f"设定集给了 {len(beats)} 个节拍，多于 {state['shot_count']} 镜，分镜时会合并低信息量的节拍。",
         )
     for position, character in enumerate(characters, start=1):
         character.setdefault("id", f"c{position}")
@@ -155,9 +160,10 @@ def _bible_request(state: AgentState) -> str:
     target = state.get("target_seconds") or 0
     if target:
         parts.append(
-            f"目标总时长：约 {target} 秒。{state['shot_count']} 个镜头，"
-            f"平均每镜约 {target / max(state['shot_count'], 1):.1f} 秒，"
-            f"beats 的数量仍必须等于镜头数。"
+            f"目标总时长：约 {target} 秒，共 {state['shot_count']} 个镜头，"
+            f"平均每镜约 {target / max(state['shot_count'], 1):.1f} 秒。"
+            f"分镜时会写成 3-5 个节拍，其中一个节拍会被拉成一个 8 秒以上的长镜头，"
+            f"所以 beats 应当按情绪转折来分，不要为了凑镜头数切碎。"
         )
     return "\n".join(parts)
 
@@ -183,7 +189,8 @@ def _shots_request(state: AgentState) -> str:
     beats = state.get("beats") or []
     if beats:
         parts.append(
-            "故事节拍（第 N 镜必须对应第 N 个节拍，顺序不得调换）：\n"
+            "故事节拍（必须全部覆盖，顺序不得调换；一个节拍可以展开成多个镜头，"
+            "也可以用一个长镜头完整呈现）：\n"
             + "\n".join(f"  {i}. {b}" for i, b in enumerate(beats, start=1))
         )
     parts.append(f"设定集：\n{json.dumps(bible, ensure_ascii=False, indent=2)}")

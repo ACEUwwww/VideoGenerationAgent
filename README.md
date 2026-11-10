@@ -442,11 +442,11 @@ workspace/projects/<project_id>/
 
 这些是**能力边界**，不是待修的缺陷：
 
-- **视频侧无参考图回灌**。Seedance 1.0 pro / pro-fast 只支持「图生视频-首帧」和「文生视频」，`reference_image` 角色是 2.0 及以上才有的能力。图像侧已实现，视频侧需开通 2.0+。
+- **视频侧无参考图回灌**。`reference_image` 角色是 Seedance 2.0 及以上才有的能力；首尾帧（`first_frame` + `last_frame`）在 1.0 pro 上就有，但 **1.0 pro-fast 不支持**，选 pro-fast 时拼接会退化成只按首帧生成，运行时会写一条告警。
 - **单进程后台任务**。`BackgroundTasks` + `asyncio.to_thread`，无任务队列、无主动取消。僵死运行能被心跳回收，但正在跑的生成任务无法中断（Seedance 单次 60-90 秒，只能等返回）。
 - **字幕只覆盖台词**，没有旁白。片头卡是 ffmpeg 绘制，不经过 LLM。
 - **`scene_consistency` 只适合同机位漂移**。跨景别已自动跳过，但它不表达「同一场景不同构图」的语义一致性——那需要视觉模型判断。
-- **视觉质检按镜打分**。MLLM 看的是单镜关键帧，不做跨镜序列级判断。
+- **视觉质检分两级**。逐镜按 Video-Bench 七维打分；成片后再把全部关键帧按播放顺序一次性交给 MLLM，判 `story_coherence` / `continuity` / `pacing`。序列级只看关键帧，不看动态。
 
 ---
 
@@ -454,6 +454,6 @@ workspace/projects/<project_id>/
 
 1. **视频侧参考图**：开通 Seedance 2.0+，把锚点关键帧作为 `reference_image` 传给视频模型，压制视频段的人物漂移。
 2. **多角色音色**：现在所有台词用同一音色。按角色的 `voice` 字段选择不同音色，需要先拿到可用音色 ID 列表。
-3. **首尾帧约束**：相邻镜头用上一镜末帧作为下一镜首帧。
-4. **可取消执行器**：替换 `BackgroundTasks`，支持中断与重启恢复。
-5. **序列级视觉质检**：MLLM 看跨镜序列而非单镜关键帧，捕捉镜头间的语义断层。
+3. **可取消执行器**：替换 `BackgroundTasks`，支持中断与重启恢复。
+
+已完成：首尾帧拼接（第 N 镜 = keyframe[N] → keyframe[N+1]）、序列级视觉质检。
