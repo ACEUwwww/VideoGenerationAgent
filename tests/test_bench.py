@@ -9,6 +9,7 @@ a unit test that spends money is not a unit test.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -419,3 +420,38 @@ def test_tiny_tail_segment_is_folded_into_its_neighbour(tmp_path):
     segments = segment_clip(path, segment_s=5.0)
     assert len(segments) == 1
     assert all(s.frame_count > 8 for s in segments)
+
+
+def test_static_instruction_asks_for_a_number_not_a_placeholder():
+    """The instruction must not show a letter where the score goes.
+
+    Upstream's template is ``- video: x ,because ...``. The judge copied the
+    literal ``x`` often enough that a real reply contained no digit at all,
+    which no parser can recover — measured on `aesthetic_quality`, which scored
+    None for that clip. Asking for an integer with an example that contains one
+    took `imaging_quality` from 3/4 to 4/4.
+    """
+    judge = object.__new__(Judge)
+    judge.config = JudgeConfig()
+    payload = FramePayload(frames=["abc"], grid_frames=[], source="x")
+    messages = judge._static_messages("system prompt", "cogvideox5b_0", payload, {})
+    text = " ".join(part["text"] for part in messages[1]["content"] if part["type"] == "text")
+
+    assert "<integer" in text or "integer 1" in text.replace("-", " ")
+    # A worked example must contain an actual digit, not just the word "score".
+    assert re.search(r"- video:\s*\d", text), text[-200:]
+
+
+def test_static_instruction_names_the_model_under_test():
+    """The judge has to know which video it is scoring.
+
+    Examples are labelled by position ("model 1"), so without the target's own
+    name the reply has nothing to attach a score to and the parser falls back
+    to a loose scan.
+    """
+    judge = object.__new__(Judge)
+    judge.config = JudgeConfig()
+    payload = FramePayload(frames=["abc"], grid_frames=[], source="x")
+    messages = judge._static_messages("system prompt", "wan21_1_3b_0", payload, {})
+    text = " ".join(part["text"] for part in messages[1]["content"] if part["type"] == "text")
+    assert "wan21_1_3b_0" in text

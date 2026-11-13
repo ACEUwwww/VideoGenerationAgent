@@ -105,7 +105,18 @@ fresh  videos_1  OK   41.1s
 
 **修复**：`_loose_score()` 新增 `scores?(?![A-Za-z])\s*(?:is|:|=)?\s*["']?(\d{1,2})`，取**最后一处**匹配（结论在末尾），拒绝小数，保留 1-max 区间校验。修复后该片段解析为 **2**。
 
-**仍存在的失败模式（未修）**：`aesthetic_quality` 上 `wan21_1_3b_1` 返回 `- video: x ,because the video has obvious severe flaws ...`——完全没给数字。请求里就没有数字，解析器无从救。根因是上游指令把分数槽位示范成字母 `x`。修法需要强化格式指令（改提示词语义），未在本次范围内。
+### 静态维度的指令把分数槽位示范成了字母（**已修**）
+
+`aesthetic_quality` 上 `wan21_1_3b_1` 曾返回 `- video: x ,because the video has obvious severe flaws ...`——**完全没给数字**，请求里就没有，解析器无从救。根因是上游指令 `"Assuming there are a video ' scoring 'x'"` 把分数槽位写成了一个字母，裁判如实照抄。
+
+**修复**：指令改为要求显式整数 `- video: <integer 1-5> ,because ...`，给出带真实数字的示例（`- video: 2 ,because ...`），并写明被评模型的名称。
+
+**验证**（同批 4 片段 × 2 维度）：**8/8 全部出分**，修复前为 6/8（`imaging_quality` 4/4、`aesthetic_quality` 4/4）。每条回复都规范收在 `- video: N ,because ...`。
+
+| 维度 | 修复前 | 修复后 | 耗时 |
+|---|---:|---:|---:|
+| `imaging_quality` | 3/4 | **4/4** | 48.9s |
+| `aesthetic_quality` | 3/4 | **4/4** | 68.3s |
 
 ### 下载失败会留下"看起来正确"的文件（已修）
 
