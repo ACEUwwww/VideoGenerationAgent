@@ -63,12 +63,23 @@ def write_report(run_dir: Path, summary: dict, config: BenchConfig) -> Path:
 
     add("## 对比对象与生成方式")
     add("")
-    add("| 模型 | 可用 | 生成方式 | 说明 |")
+    add("| 模型 | 本轮出片 | 生成方式 | 说明 |")
     add("| --- | --- | --- | --- |")
+    # Availability is probed when the report is written, but the clips were
+    # produced earlier. A run generated with VIDEO_PROVIDER=ark and reported
+    # afterwards with the provider back on mock said "unavailable" for a model
+    # whose four scored clips were sitting in the same directory. What the
+    # reader needs to know is whether this run has clips for the model, so that
+    # is what the column reports; the probe's detail moves to a note.
+    produced = {c["model"] for c in clips}
     for row in manifest["backends"]:
         if row["name"] not in models:
             continue
-        add(f"| `{row['name']}` | {'是' if row['available'] else '否'} | {row['modality']} | {row['detail']} |")
+        shown = "是" if row["name"] in produced else "否"
+        detail = row["detail"]
+        if row["name"] in produced and not row["available"]:
+            detail = f"片段已生成；当前环境探测：{detail}"
+        add(f"| `{row['name']}` | {shown} | {row['modality']} | {detail} |")
     add("")
     add("生成方式不同、且已经分开记录：本项目走「关键帧 → 图生视频」，开源模型走「文生视频」。")
     add("两者不是同一个任务，所以下面的分数比较的是各自的产物质量，不是同一条流水线的高低。")

@@ -124,6 +124,13 @@ def test_loose_score_covers_measured_reply_shapes(text, maximum, expected):
         ("Evaluation Result\n<result> 3 </result>", 3),
         ("no result here", None),
         ("Evaluation Result: 9 because", None),
+        # Measured reply. The model name contains a digit, and the old pattern
+        # read the 5 inside "cogvideox5b" as the score, rejected it as out of
+        # range, and returned None — three of four clips scored None because of
+        # this, so the fraction has to win.
+        ("[Evaluation Result]:\ncogvideox5b: 3/5. A person is present.", 3),
+        ("[Evaluation Result]:\nlonglive_1_3b: 1/5. The clip shows no marching.", 1),
+        ("[Evaluation Result]:\nours: 2/3. Partial match.", 2),
     ],
 )
 def test_consistency_parse(text, expected):

@@ -468,22 +468,49 @@ class Judge:
                 {"type": "text", "text": f"{model_line}\n"},
                 *frames,
                 {"type": "text", "text": f"The name of the AI medel is {name}\n"},
+                {"type": "text", "text": (
+                    "\nAfter the description, write the evaluation result as exactly "
+                    "this two-line block and nothing else on that line:\n"
+                    f"[Evaluation Result]:\n{name}: <integer 1-3>/3\n\n"
+                    "The score is an integer from 1 to 3, where 3 means the video fully "
+                    "matches the text prompt. Write the number itself — the template's "
+                    "placeholder text is not a score.\n"
+                )},
             ]},
         ])
         return self._parse_consistency(final), final
 
     @staticmethod
     def _parse_consistency(text: str) -> float | None:
-        """Read the score that follows "Evaluation Result", as upstream does.
+        """Read the score that follows "Evaluation Result".
 
-        Upstream additionally requires the word "because" before the number,
-        which yields a raw string "None" the moment the judge phrases it
-        differently. The number after the labelled result is what matters.
+        Upstream requires the word "because" before the number, which yields the
+        string "None" the moment the judge phrases it differently.
+
+        Two shapes are tried, most explicit first. The order matters because a
+        bare digit scan is unsafe here: model names contain digits, and the
+        result block usually repeats the model name. A measured reply was::
+
+            [Evaluation Result]:
+            cogvideox5b: 3/5. A person is present and performs a stepping motion
+
+        The old pattern ``Evaluation Result[^0-9]{0,80}?(\\d+)`` stopped at the
+        ``5`` inside ``cogvideox5b``, read it as the score, found it out of the
+        1-3 range and returned None — even though ``3/5`` was right there. The
+        fraction is checked first so the model name cannot shadow it, and the
+        bare-digit fallback refuses a digit that continues a word.
         """
-        match = re.search(r"Evaluation Result[^0-9]{0,80}?(\d+)", text, re.DOTALL | re.IGNORECASE)
-        if match is None:
+        tail = text[text.lower().rfind("evaluation result"):] if "evaluation result" in text.lower() else text
+
+        fraction = re.search(r"(?<![A-Za-z0-9])(\d{1,2})\s*/\s*[35]\b", tail)
+        if fraction is not None:
+            value = int(fraction.group(1))
+            return value if 1 <= value <= 3 else None
+
+        bare = re.search(r"(?<![A-Za-z0-9])(\d{1,2})(?![A-Za-z0-9])", tail)
+        if bare is None:
             return None
-        value = int(match.group(1))
+        value = int(bare.group(1))
         return value if 1 <= value <= 3 else None
 
     def score(self, dimension: str, payloads: dict[str, FramePayload], video_prompt: str = "") -> JudgeReply:

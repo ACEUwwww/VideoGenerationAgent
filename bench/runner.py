@@ -180,6 +180,12 @@ def judge_all(
                 errors.append(f"{prompt_text[:40]} seed={seed}: {reply.error}")
             per_group[f"{prompt_text} | seed={seed}"] = {
                 "scores": reply.scores, "error": reply.error,
+                # The raw replies are what a parse failure is diagnosed from.
+                # Without them a None score is indistinguishable from a call
+                # that never returned a number, and the run has to be paid for
+                # again to find out. Truncated: a full reply is prose, and what
+                # matters is whether it ended in a parseable line.
+                "raw": {name: text[-400:] for name, text in reply.raw.items()},
             }
             for model, score in reply.scores.items():
                 if score is not None:
@@ -258,10 +264,33 @@ def write_run(
     ]
     (run_dir / "clips.json").write_text(json.dumps(clips, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    # Merge with whatever dimensions are already cached. A run is often judged
+    # in several passes — one dimension re-scored after a fix, the rest left
+    # alone — and writing only this pass's dimensions erased the others from
+    # summary.json, so the report silently lost them while their per-dimension
+    # cache files were still on disk.
+    merged: dict[str, dict] = {}
+    for cache_file in sorted((run_dir / "judge").glob("*.json")):
+        try:
+            cached = json.loads(cache_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        dimension = cached.get("dimension") or cache_file.stem
+        merged[dimension] = {
+            "scores": cached.get("scores", {}),
+            "elapsed_s": cached.get("elapsed_s", 0.0),
+            "error": cached.get("error", ""),
+        }
+    for dimension, reply in replies.items():
+        merged[dimension] = {
+            "scores": reply.scores,
+            "elapsed_s": round(reply.elapsed_s, 1),
+            "error": reply.error,
+        }
+
     summary = {
         "run": run_dir.name,
-        "dimensions": {d: {"scores": r.scores, "elapsed_s": round(r.elapsed_s, 1), "error": r.error}
-                       for d, r in replies.items()},
+        "dimensions": merged,
         "usage": replies[list(replies)[0]].usage if replies else {},
     }
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -397,18 +426,48 @@ def _load_existing(run_dir: Path, models: list[str]) -> list[Generation]:
     there. Falling back to the directory means any stage can pick up a run that
     was left part-finished.
     """
+    # The manifest carries the prompts the run was started with, keyed by slug.
+    # Both branches below need it: judge_all groups clips by (prompt, seed), so
+    # four models carrying four different "prompts" collapse into four
+    # single-model groups and the dynamic dimensions — the ones that compare
+    # models inside one call — silently become per-model judgements. That
+    # happened, and it is why a stale clips.json cannot be trusted for the text.
+    manifest_prompts: list[dict] = []
+    manifest_path = run_dir / "manifest_prompts.json"
+    if manifest_path.exists():
+        manifest_prompts = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    def _true_prompt(slug: str) -> str:
+        return next(
+            (row["text"] for row in manifest_prompts if row.get("slug") == slug),
+            slug,
+        )
+
     clips = run_dir / "clips.json"
     if clips.exists():
         out = []
         for row in json.loads(clips.read_text(encoding="utf-8")):
             if row["model"] not in models:
                 continue
+            stored = row["prompt"]
             out.append(Generation(
-                model=row["model"], prompt=row["prompt"], seed=row["seed"],
+                model=row["model"], prompt=_true_prompt(stored), seed=row["seed"],
                 path=run_dir / row["file"], seconds=row["seconds"], width=0, height=0, fps=0,
-                modality=row.get("modality", ""), elapsed_s=0.0, note="reused",
+                modality=row.get("modality", ""), elapsed_s=row.get("elapsed_s", 0.0),
+                note="reused",
             ))
         return out
+
+    # The manifest carries the prompts the run was started with. Without it the
+    # discovered prompt has to come from the filename, which holds a slug, not
+    # the text — and a wrong prompt is not cosmetic: judge_all groups clips by
+    # (prompt, seed), so four models with four different "prompts" collapse into
+    # four single-model groups and the dynamic dimensions stop comparing them.
+    # That happened: temporal_consistency was scored in four separate calls.
+    manifest_prompts: list[dict] = []
+    manifest_path = run_dir / "manifest_prompts.json"
+    if manifest_path.exists():
+        manifest_prompts = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     out = []
     for model in models:
@@ -419,8 +478,13 @@ def _load_existing(run_dir: Path, models: list[str]) -> list[Generation]:
                 seed = int(path.stem.rsplit("-", 1)[-1])
             except ValueError:
                 seed = 0
+            slug = path.stem.rsplit("-", 1)[0]
+            prompt = next(
+                (row["text"] for row in manifest_prompts if row.get("slug") == slug),
+                slug,
+            )
             out.append(Generation(
-                model=model, prompt=path.stem.rsplit("-", 1)[0], seed=seed,
+                model=model, prompt=prompt, seed=seed,
                 path=path, seconds=0.0, width=0, height=0, fps=0,
                 modality="", elapsed_s=0.0, note="discovered",
             ))
