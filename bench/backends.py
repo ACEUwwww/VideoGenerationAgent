@@ -13,11 +13,13 @@ judge-only path (score existing clips) has no reason to load a 5B model.
 
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .config import LONGLIVE_ROOT, MODEL_ROOT, PROJECT_ROOT, BenchConfig
+from .config import LONGLIVE_ROOT, MODEL_ROOT, OPENMONTAGE_ROOT, PROJECT_ROOT, BenchConfig
 
 
 @dataclass
@@ -192,7 +194,7 @@ class DiffusersT2VBackend:
         ``bench/models/hf/<org>/<repo>/`` so ``from_pretrained`` can be pointed
         at a local directory and never touches the network mid-run.
         """
-        from .config import LONGLIVE_ROOT, MODEL_ROOT, PROJECT_ROOT, BenchConfig
+        from .config import LONGLIVE_ROOT, MODEL_ROOT, OPENMONTAGE_ROOT, PROJECT_ROOT, BenchConfig
 
         candidate = BenchConfig().model_root / self.model_id
         return candidate if (candidate / "model_index.json").exists() else None
@@ -368,11 +370,98 @@ class LongLiveBackend:
         )
 
 
+# A multi-stage drama workflow from an open-source project, driven through its
+# own generation tool.
+#
+# OpenMontage runs script -> characters -> scenes -> storyboard -> shots ->
+# voice -> edit through a seven-stage studio. What this backend calls is its
+# direct Ark adapter, i.e. the *shot* stage only: prompt in, clip out, no
+# planning layer in front of it.
+#
+# That is deliberate, and it is the point of the baseline. The pipeline's own
+# orchestration (script writing, storyboard, keyframe generation, reference
+# propagation) lives in its web service, which needs Postgres, Redis and MinIO
+# to boot. Reaching the shot tool directly isolates one variable: the same
+# Seedance model, asked with the same bare prompt our pipeline starts from,
+# but without a keyframe or a reference image in front of it. Any gap between
+# this and `ours` is the work the orchestration does, not a different model.
+class OpenMontageBackend:
+    name = "openmontage_shot"
+    modality = "t2v (OpenMontage shot stage, Seedance via Ark)"
+
+    def __init__(self, repo: Path, *, width: int = 720, height: int = 1280, fps: int = 24):
+        self.repo = repo
+        self.width = width
+        self.height = height
+        self.fps = fps
+
+    def available(self) -> tuple[bool, str]:
+        if not (self.repo / "tools" / "video" / "seedance_ark.py").exists():
+            return False, f"OpenMontage is not vendored at {self.repo}"
+        if not os.environ.get("ARK_API_KEY"):
+            return False, "ARK_API_KEY is not set"
+        return True, f"{self.repo} (shot stage only)"
+
+    def generate(self, prompt: str, seed: int, seconds: float, out_dir: Path) -> Generation:
+        import time
+
+        sys.path.insert(0, str(self.repo))
+        try:
+            from tools.video.seedance_ark import SeedanceArkVideo
+        finally:
+            sys.path.pop(0)
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        target = (out_dir / f"{self.name}_{seed}.mp4").resolve()
+
+        tool = SeedanceArkVideo()
+        started = time.monotonic()
+        result = tool.execute({
+            "operation": "text_to_video",
+            "prompt": prompt,
+            "duration": int(max(4, round(seconds))),
+            "aspect_ratio": "9:16",
+            "resolution": "720p",
+            "output_path": str(target),
+            "seed": seed,
+            # The account's activated model (ARK_VIDEO_MODEL) is a 1.0 pro-fast
+            # build, which is not in the tool's published price table, so the
+            # tool refuses to submit rather than assume the call is free. The
+            # figure below is the published "fast" 720p rate, used only for the
+            # tool's own budget accounting — Ark bills by actual usage, and the
+            # run records the returned usage alongside the clip.
+            "custom_price_cny_per_million_tokens": 37.0,
+        })
+        elapsed = time.monotonic() - started
+
+        if not result.success:
+            raise RuntimeError(f"OpenMontage seedance_ark failed: {result.error}")
+        produced = Path(result.data["output_path"])
+        if produced != target and produced.exists():
+            produced.replace(target)
+        if not target.exists():
+            raise RuntimeError(f"OpenMontage produced no file at {target}")
+
+        return Generation(
+            model=self.name,
+            prompt=prompt,
+            seed=seed,
+            path=target,
+            seconds=float(result.data.get("duration") or seconds),
+            width=self.width,
+            height=self.height,
+            fps=self.fps,
+            modality=self.modality,
+            elapsed_s=elapsed,
+            note=f"{result.data.get('model', '')} | shot stage only, no storyboard",
+        )
+
+
 # Vertical is the project's canvas, so the open-source models are asked for the
 # tallest shape each one was actually trained on. CogVideoX was trained at
 # 720x480; 480x720 is its published portrait bucket. Wan's is 832x480, so its
 # portrait counterpart is 480x832.
-REGISTRY: dict[str, DiffusersT2VBackend | "LongLiveBackend"] = {
+REGISTRY: dict[str, DiffusersT2VBackend | LongLiveBackend | OpenMontageBackend] = {
     "cogvideox5b": DiffusersT2VBackend(
         "cogvideox5b",
         "zai-org/CogVideoX-5b",
@@ -393,6 +482,7 @@ REGISTRY: dict[str, DiffusersT2VBackend | "LongLiveBackend"] = {
         steps=40,
         guidance=5.0,
     ),
+    "openmontage_shot": OpenMontageBackend(OPENMONTAGE_ROOT),
     "longlive_1_3b": LongLiveBackend(
         repo=LONGLIVE_ROOT,
         models_root=MODEL_ROOT,

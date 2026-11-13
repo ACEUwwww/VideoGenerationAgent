@@ -26,6 +26,7 @@ VENDOR_ROOT = BENCH_ROOT / "_vendor" / "Video-Bench"
 # Long-video workflow vendors live beside Video-Bench, one directory per repo.
 # Like Video-Bench they are fetched, not committed.
 LONGLIVE_ROOT = BENCH_ROOT / "_vendor" / "LongLive" / "LongLive1.0"
+OPENMONTAGE_ROOT = BENCH_ROOT / "_vendor" / "OpenMontage"
 # Weights land here as plain diffusers repos: <org>/<repo>/model_index.json.
 # bench/fetch_models.sh writes exactly this layout, and the backends load from
 # it directly, so the two cannot drift apart.

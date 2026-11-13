@@ -44,19 +44,24 @@ plt.rcParams["axes.unicode_minus"] = False
 BENCH_ROOT = Path(__file__).resolve().parent
 
 # Fixed order and one hue per model, assigned by identity so every panel agrees.
-MODELS = ["ours", "longlive_1_3b", "wan21_1_3b", "cogvideox5b"]
+MODELS = ["ours", "openmontage_shot", "longlive_1_3b", "wan21_1_3b", "cogvideox5b"]
 LABELS = {
     "ours": "本项目 workflow",
+    "openmontage_shot": "OpenMontage（同底模）",
     "longlive_1_3b": "LongLive-1.3B",
     "wan21_1_3b": "Wan2.1-1.3B",
     "cogvideox5b": "CogVideoX-5B",
 }
-# Validated categorical slots 1-4 from the dataviz reference palette.
+# Categorical slots in fixed order from the reference palette. Slot 4 (yellow)
+# sits beside slot 2 (orange) under all-pairs checking, which only matters for
+# scatter-like forms; these are grouped bars, where the adjacent pairlist
+# applies and the order validates.
 COLORS = {
     "ours": "#2a78d6",
-    "longlive_1_3b": "#eb6834",
-    "wan21_1_3b": "#1baf7a",
-    "cogvideox5b": "#eda100",
+    "openmontage_shot": "#eb6834",
+    "longlive_1_3b": "#1baf7a",
+    "wan21_1_3b": "#eda100",
+    "cogvideox5b": "#e34948",
 }
 
 INK = "#0b0b0b"
@@ -138,7 +143,7 @@ def chart_scores(data: dict, out_path: Path) -> None:
     _style(ax)
 
     x = np.arange(len(dims))
-    width = 0.2
+    width = 0.17
     for i, model in enumerate(MODELS):
         offsets = []
         heights = []
@@ -169,8 +174,8 @@ def chart_scores(data: dict, out_path: Path) -> None:
     ax.set_ylabel("得分", color=INK_2, fontsize=10)
     ax.set_title(title, color=INK, fontsize=13, loc="left", pad=14)
     ax.legend(
-        frameon=False, ncol=4, loc="upper left",
-        bbox_to_anchor=(0, -0.16), fontsize=9.5, labelcolor=INK_2,
+        frameon=False, ncol=5, loc="upper left",
+        bbox_to_anchor=(0, -0.18), fontsize=9, labelcolor=INK_2,
     )
     fig.tight_layout()
     fig.savefig(out_path, facecolor=SURFACE, bbox_inches="tight")
@@ -267,7 +272,7 @@ def chart_profile(data: dict, out_path: Path) -> None:
     # dwarfed by a 1-5 one. The reader is comparing shape, not raw points.
     maxima = {d: max((data["scores"][d].get(m) or 0) for m in MODELS) or 1 for d in dims}
     x = np.arange(len(dims))
-    width = 0.2
+    width = 0.17
     for i, model in enumerate(MODELS):
         values = [((data["scores"].get(d, {}).get(model) or 0) / maxima[d]) for d in dims]
         offset = (i - (len(MODELS) - 1) / 2) * width
@@ -281,8 +286,8 @@ def chart_profile(data: dict, out_path: Path) -> None:
     ax.set_ylabel("相对该维度最高分", color=INK_2, fontsize=10)
     ax.set_title("各维度相对表现（每个维度按自身最高分归一）",
                  color=INK, fontsize=13, loc="left", pad=14)
-    ax.legend(frameon=False, ncol=4, loc="upper left",
-              bbox_to_anchor=(0, -0.18), fontsize=9.5, labelcolor=INK_2)
+    ax.legend(frameon=False, ncol=5, loc="upper left",
+              bbox_to_anchor=(0, -0.20), fontsize=9, labelcolor=INK_2)
     fig.tight_layout()
     fig.savefig(out_path, facecolor=SURFACE, bbox_inches="tight")
     plt.close(fig)
