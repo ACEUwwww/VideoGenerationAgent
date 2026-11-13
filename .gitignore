@@ -20,3 +20,13 @@ workspace/projects/*/
 
 # Test artifacts from smoke scripts.
 workspace/projects/_*/
+
+# ---- bench: comparison harness against Video-Bench ----
+# Vendored upstream checkout (own .git) and the model weights/caches are
+# restored by bench/setup_vendor.py and the HF download, never committed.
+bench/_vendor/
+bench/models/
+bench/.venv/
+bench/data/
+bench/results/
+bench/_smoke/

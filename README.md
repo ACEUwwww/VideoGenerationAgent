@@ -27,8 +27,9 @@ mcp_servers/       MCP-like 工具层
   videobench_eval.py     Video-Bench 维度打分
   keyframe_memory.py     关键帧记忆（跨镜一致性锚点）
   evaluators.py          文件级硬性校验
+bench/             与开源模型对比（Video-Bench 裁判），见第 11 节
 workspace/projects/<id>/  每次运行的全部产物
-tests/             pytest：56 项
+tests/             pytest：86 项
 ```
 
 **三层职责分离**，替换任何一层都不影响其他层：
@@ -438,7 +439,112 @@ workspace/projects/<project_id>/
 
 ---
 
-## 11. 已知边界
+## 11. Benchmark：与开源模型对比
+
+`bench/` 用 [Video-Bench](https://github.com/Video-Bench/Video-Bench) 的维度体系，把本项目的产物和开源文生视频模型放在同一把尺子上打分。
+
+### 11.1 接的是什么
+
+Video-Bench 本身是一个**裁判器**：把视频抽帧交给多模态模型，按 9 个维度打 1-5 / 1-3 分。原版写死 GPT-4o；这里改用 Ark 豆包（`doubao-seed-2-1-pro`），走同一个 OpenAI-compatible 接口。
+
+裁判和生成分开：`bench/judge.py` 只吃已经准备好的帧载荷，`bench/backends.py` 只负责出片。所以重新打分不必重渲染，改裁判不必重出片。
+
+### 11.2 上游的四个坑
+
+vendored 的 Video-Bench 有缺陷，这里**不修改它的源码**（`bench/_vendor/` 不入库，按 commit 拉取），而是在 bench 里重写了执行循环：
+
+| 问题 | 位置 | 后果 |
+|---|---|---|
+| `modelname` 在赋值前被读取 | `VideoTextAlignment.py:327` | 实测 `UnboundLocalError`，5 个 video-text 维度全部跑不起来 |
+| 裁判模型名硬编码 5 处 | static/dynamic/VideoTextAlignment | 换 base_url 即 404 |
+| `overall_consistency` 无路由 | `videobench/__init__.py` | 有 prompt、有 91 条标注题，但调度器抛 `ValueError` |
+| `video-text consistency` 键不存在 | `prompt_dict.py` | 按 README 的维度名调用抛 `KeyError` |
+
+上游标准模式实测只有 4 个维度可跑（2 static + 2 dynamic）。bench 覆盖全部 9 个。
+
+另外两处按需修正：抽帧在客户端降到最长边 640px（1080×1920 原样编码实测 17.8 MB/视频，易被请求体上限拒绝；640px 下 4 秒片段 1.0 MB），以及给每个模型的图片块加上标签（上游的 grid view 拼接块不带模型名，多模型同调时裁判无法归属分数）。
+
+### 11.3 跑法
+
+```bash
+python bench/setup_vendor.py                      # 拉 vendored Video-Bench（不入库）
+
+# 权重：并行分片下载，然后用官方 sha256 校验（见 11.4）
+bench/fetch_models.sh zai-org/CogVideoX-5b 12
+bench/fetch_models.sh Wan-AI/Wan2.1-T2V-1.3B-Diffusers 12
+bench/verify_models.sh zai-org/CogVideoX-5b
+bench/verify_models.sh Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+
+bench/.venv/bin/python -m bench.runner --estimate  # 只算预算，不花钱
+bench/.venv/bin/python -m bench.runner \
+    --models ours cogvideox5b wan21_1_3b longlive_1_3b \
+    --prompts 1 --seeds 0 1 --seconds 5 \
+    --dimensions imaging_quality aesthetic_quality motion_effects overall_consistency
+
+# 分段评测：本地、零成本，不需要裁判
+bench/.venv/bin/python -m bench.runner \
+    --models longlive_1_3b --stage segment --segment-seconds 5 --run-dir <run>
+```
+
+裁判要花钱，需要 `ARK_ALLOW_PAID=1` 与 `BENCH_ALLOW_PAID=1` 同时为 1。生成和判分可分开跑（`--stage generate` / `--stage segment` / `--stage judge`），产物按维度缓存。
+
+`ours` 后端要求 `VIDEO_PROVIDER=ark`（mock 出的是占位片，不算竞品）。
+
+`longlive_1_3b` 是长视频基线（Wan2.1-1.3B + 自回归 KV-cache，Apache 2.0）。它需要 vendored 仓库与原生 Wan `.pth` 权重，且走子进程调用——其 requirements 锁 `diffusers==0.31.0`，与本 harness 的 0.42.1 冲突。
+
+### 11.4 权重完整性与一个实测踩到的坑
+
+下载器拿 `curl -r` 分片取，写盘用 `dd of=... bs=1M seek=$((s/1048576)) conv=notrunc`。这行**看起来能用、文件长度也对，但内容全是错的**：`bs=1M` 下 `seek` 的单位是 1 MiB 块，`s/1048576` 向下取整，于是除第一块外每个分片都写到了错误偏移，互相覆盖。
+
+后果不是报错，而是模型正常加载、正常出片、画面**全黑且像素是 NaN**。`stat` 出来的文件大小与远端完全一致，所以只看长度发现不了。
+
+修法是 `bs=1M` 配 `oflag=seek_bytes`（`seek` 按字节解释，实测 1000 字节写入偏移 999 确实落在 999）：
+```bash
+dd of="$out" bs=1M seek="$s" oflag=seek_bytes conv=notrunc status=none
+```
+
+因此下载后**必须校验 sha256**，不能只比大小。HF 对 LFS 文件在 `HEAD` 响应里给出 `x-linked-etag`，脚本据此比对：
+
+```bash
+bench/verify_models.sh zai-org/CogVideoX-5b             # 只检查
+bench/verify_models.sh zai-org/CogVideoX-5b --fix       # 重下损坏文件
+```
+
+### 11.5 对比口径
+
+两类模型做的**不是同一个任务**，报告里分开记录、不做归一：
+
+- `ours`：关键帧 → 图生视频（i2v）
+- `cogvideox5b` / `wan21_1_3b`：文生视频（t2v）
+
+因此单镜分数比较的是各自产物质量，不是同一条流水线的高低。时长与帧率也各按模型的训练设定取整（CogVideoX 8fps、Wan 16fps），与目标时长有小幅偏差。
+
+### 11.6 本次对比的边界
+
+- 9 个维度分两组，1-5 与 1-3 **不可相加或平均**，报告分两栏。
+- 冒烟规模下每模型每 prompt 只有一两条片段，单条分数不是模型的稳定水平。
+- 没有做人工对齐复现；只用 Video-Bench 的裁判与维度，没有复现论文的人类偏好相关性。
+
+### 11.7 分段评测
+
+单一总分看不见长视频是怎么坏的。`bench/segments.py` 把片段切成固定窗口，分三层量：
+
+| 层 | 内容 | 是否花钱 |
+|---|---|---|
+| 段内质量 | 每秒运动、闪烁、亮度、饱和度 | 否 |
+| 跨段一致性 | 与**首段**比（非链式），结构 + 色彩 | 否 |
+| 全局 | 漂移起点、最差转场、运动离散度 | 否 |
+
+锚定首段而非上一段是关键：链式比较下每步只差一点，累积漂移会被看成稳定。
+
+实测一条 30 秒 LongLive 片段：切 6 段后一致性 0.941 → 0.702 单调下滑，饱和度 122 → 95，
+**第 4 段（20 秒处）检出漂移**。这些数字被平均成一个总分后全部消失。
+
+用固定窗口而非镜头边界：镜头边界是被评 workflow 自己的决定，不该在评分前替它定好。
+
+---
+
+## 12. 已知边界
 
 这些是**能力边界**，不是待修的缺陷：
 

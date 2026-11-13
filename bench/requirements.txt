@@ -1,0 +1,17 @@
+# Bench environment: bench/.venv. The pipeline's own .venv is untouched.
+# Reference judge + frame prep.
+openai>=2.0
+opencv-python-headless>=4.10
+python-dotenv>=1.0.1
+tenacity>=8.0
+# Open-source baselines. torch is expected from the host image (CUDA build);
+# the bench venv is created with --system-site-packages so it is not reinstalled.
+diffusers==0.42.1
+transformers>=5.20
+huggingface_hub>=1.32,<3.0
+accelerate>=1.0
+imageio>=2.34
+imageio-ffmpeg>=0.5
+sentencepiece>=0.2
+ftfy>=6.1
+hf_transfer>=0.1
