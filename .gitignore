@@ -30,3 +30,4 @@ bench/.venv/
 bench/data/
 bench/results/
 bench/_smoke/
+bench/logs/

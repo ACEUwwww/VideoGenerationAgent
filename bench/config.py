@@ -114,10 +114,13 @@ class BenchConfig:
 
 def load_config() -> BenchConfig:
     load_dotenv()
+    # The judge endpoint is overridable so both sides of the comparison can be
+    # scored by one model. Judging workflow A with a hosted model and workflow B
+    # with another measures the judges' disagreement, not the pipelines.
     judge = JudgeConfig(
         model=_env("BENCH_JUDGE_MODEL") or _env("ARK_VISION_MODEL", "doubao-seed-2-1-pro-260915"),
-        base_url=_env("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3"),
-        api_key=_env("ARK_API_KEY"),
+        base_url=_env("BENCH_JUDGE_BASE_URL") or _env("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3"),
+        api_key=_env("BENCH_JUDGE_API_KEY") or _env("ARK_API_KEY"),
         reasoner_model=_env("BENCH_JUDGE_REASONER_MODEL"),
         sample_fps=int(_env("BENCH_SAMPLE_FPS", "2")),
         grid_size=int(_env("BENCH_GRID_SIZE", "4")),
