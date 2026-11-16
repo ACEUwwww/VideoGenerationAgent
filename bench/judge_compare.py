@@ -81,9 +81,20 @@ def dynamic_parts(grids: dict[str, list[str]], dimension: str, grid_size: int) -
 
 
 def parse_scores(text: str) -> dict[str, int | None]:
+    """Per-model scores, tolerating the markdown a larger model writes.
+
+    The 7B echoes the requested line literally (``- ours: 4 ,because``). The
+    32B wraps the label in bold (``- **ours**: 4 , because``) and inserts a
+    space after the comma. The bench's own parser found nothing at all for the
+    32B replies — four 5s and two 4s read back as five Nones — so the label is
+    matched with optional emphasis markers around it.
+    """
     out: dict[str, int | None] = {}
     for name in MODELS:
-        m = re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])\s*[:\-]?\s*(\d{{1,2}})", text, re.I)
+        m = re.search(
+            rf"(?<![A-Za-z0-9_])[\*_]*{re.escape(name)}[\*_]*(?![A-Za-z0-9_])\s*\**\s*[:\-]\s*\**\s*(\d{{1,2}})",
+            text, re.I,
+        )
         out[name] = int(m.group(1)) if m else None
     return out
 

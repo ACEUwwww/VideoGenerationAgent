@@ -254,7 +254,16 @@ class Judge:
         for label in sorted(labels, key=len, reverse=True):
             # The label must stand alone: without the boundary, ``model_1``
             # matches inside ``model_10: 2`` and reads the 0.
-            pattern = rf"(?<![A-Za-z0-9_]){re.escape(label)}(?![A-Za-z0-9_])\s*[:\-]?\s*(\d{{1,2}})"
+            #
+            # Emphasis markers are optional. The 7B judge echoes the requested
+            # line literally, but the 32B writes ``- **ours**: 5 , because`` —
+            # measured on real replies, where the bare pattern returned None for
+            # every model while the text held 1/4/5/5/4. A markdown reply is not
+            # a malformed one, so it is parsed rather than retried.
+            pattern = (
+                rf"(?<![A-Za-z0-9_])[\*_]*{re.escape(label)}[\*_]*(?![A-Za-z0-9_])"
+                rf"\s*\**\s*[:\-]\s*\**\s*(\d{{1,2}})"
+            )
             match = re.search(pattern, text, re.IGNORECASE)
             if match is None:
                 by_label[label] = None
@@ -296,7 +305,12 @@ class Judge:
             # lookahead only rejects a point followed by another digit.
             r"(?<![A-Za-z])scores?(?![A-Za-z])\s*(?:is|:|=)?\s*[\"']?(\d{1,2})[\"']?(?!\d)(?!\.\d)",
             r"scoring\s+['\"]?(\d{1,2})['\"]?",
-            r"- video:\s*(\d{1,2})\s*,?\s*because",
+            # Emphasis markers may wrap the whole verdict line, not just the
+            # label: the 7B writes ``- video: 4 ,because`` and the 32B writes
+            # ``- **video: 2**, because``. The bare anchor missed every 32B
+            # verdict, so imaging_quality and aesthetic_quality returned None
+            # for three of five models while the replies plainly held 4 and 2.
+            r"-[\s\*]*video[\s\*]*:[\s\*]*(\d{1,2})[\s\*]*\s*,?\s*\**\s*(?:because|,|$)",
             r"because\s*\(\s*(\d{1,2})\s*/\s*5\s*\)",
         )
         for pattern in patterns:
