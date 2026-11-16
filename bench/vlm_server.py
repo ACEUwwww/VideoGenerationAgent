@@ -35,6 +35,12 @@ MODEL_ID = os.environ.get("VLM_MODEL_DIR", "")
 SERVED_NAME = os.environ.get("VLM_NAME", "qwen2.5-vl-7b-local")
 HOST = os.environ.get("VLM_HOST", "127.0.0.1")
 PORT = int(os.environ.get("VLM_PORT", "8790"))
+# The bench judge sends no max_tokens, because the hosted judge's own default was
+# enough for it. Qwen2.5-VL reasons at length before writing its final score
+# line — motion_effects measured 1354 completion tokens for five videos and was
+# cut off mid-sentence at 512, producing no score at all. 2048 leaves room for
+# the analysis plus the labelled lines. max_tokens on the request still wins.
+DEFAULT_MAX_TOKENS = int(os.environ.get("VLM_DEFAULT_MAX_TOKENS", "2048"))
 
 _model = None
 _processor = None
@@ -108,7 +114,7 @@ def complete(payload: dict) -> dict:
     messages, images = _build_messages(payload)
     text = _processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = _processor(text=[text], images=images or None, return_tensors="pt").to("cuda")
-    max_new = int(payload.get("max_tokens") or 512)
+    max_new = int(payload.get("max_tokens") or DEFAULT_MAX_TOKENS)
     with _lock, torch.inference_mode():
         out = _model.generate(
             **inputs,
@@ -178,7 +184,7 @@ class Handler(BaseHTTPRequestHandler):
         messages, images = _build_messages(payload)
         text = _processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = _processor(text=[text], images=images or None, return_tensors="pt").to("cuda")
-        max_new = int(payload.get("max_tokens") or 512)
+        max_new = int(payload.get("max_tokens") or DEFAULT_MAX_TOKENS)
         prompt_len = int(inputs["input_ids"].shape[1])
 
         self.send_response(200)
