@@ -78,7 +78,22 @@ class PipelineBackend:
             return False, "VIDEO_PROVIDER=mock renders a placeholder clip, which is not a competitor"
         if provider == "ark" and os.environ.get("ARK_ALLOW_PAID") != "1":
             return False, "VIDEO_PROVIDER=ark needs ARK_ALLOW_PAID=1"
-        return True, provider
+        # The keyframe is the first frame Seedance animates, so a placeholder
+        # keyframe puts burn-in text into the final clip. This happened: a run
+        # exported VIDEO_PROVIDER=ark but not IMAGE_PROVIDER, so the keyframe
+        # fell back to mock and the clip shipped with "MOCK FRAME · replace
+        # IMAGE_PROVIDER to render real art" across the frame — and the judge
+        # scored it 5/5/5/5, because the text is legible and the picture is
+        # sharp. A mixed-provider clip is not this pipeline's output, so it is
+        # refused rather than scored.
+        image_provider = os.environ.get("IMAGE_PROVIDER", "mock")
+        if image_provider == "mock":
+            return (
+                False,
+                "IMAGE_PROVIDER=mock draws a placeholder keyframe, which burns its "
+                "label into the clip Seedance animates; set IMAGE_PROVIDER=ark too",
+            )
+        return True, f"video={provider} image={image_provider}"
 
     def generate(self, prompt: str, seed: int, seconds: float, out_dir: Path) -> Generation:
         import os
@@ -416,6 +431,17 @@ class OpenMontageBackend:
 
         tool = SeedanceArkVideo()
         started = time.monotonic()
+        # The model has to be pinned to the one this account has activated.
+        # Left out, the tool falls back to its own default
+        # (``doubao-seedance-2-0-260128``), which this account has not opened
+        # — both seeds failed with ModelNotOpen — and, more importantly, which
+        # is a different build from the one ``ours`` renders with. A comparison
+        # that claims to hold the generator fixed has to actually hold it fixed,
+        # so ARK_VIDEO_MODEL is passed through explicitly and the report prints
+        # it. ``model_variant`` is left at "standard" because the variant only
+        # picks the fallback; an explicit model id wins over it.
+        model_id = os.environ.get("ARK_VIDEO_MODEL", "")
+        self.model_id = model_id
         result = tool.execute({
             "operation": "text_to_video",
             "prompt": prompt,
@@ -424,13 +450,11 @@ class OpenMontageBackend:
             "resolution": "720p",
             "output_path": str(target),
             "seed": seed,
-            # The account's activated model (ARK_VIDEO_MODEL) is a 1.0 pro-fast
-            # build, which is not in the tool's published price table, so the
-            # tool refuses to submit rather than assume the call is free. The
-            # figure below is the published "fast" 720p rate, used only for the
-            # tool's own budget accounting — Ark bills by actual usage, and the
-            # run records the returned usage alongside the clip.
+            # Ark bills by actual usage; this figure only feeds the tool's own
+            # budget accounting, and an id outside its price table makes the
+            # tool refuse to submit rather than guess.
             "custom_price_cny_per_million_tokens": 37.0,
+            **({"model": model_id} if model_id else {}),
         })
         elapsed = time.monotonic() - started
 

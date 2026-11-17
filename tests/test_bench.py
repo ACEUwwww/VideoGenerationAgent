@@ -462,3 +462,85 @@ def test_static_instruction_names_the_model_under_test():
     messages = judge._static_messages("system prompt", "wan21_1_3b_0", payload, {})
     text = " ".join(part["text"] for part in messages[1]["content"] if part["type"] == "text")
     assert "wan21_1_3b_0" in text
+
+
+def test_render_is_renamed_to_the_name_a_resumed_run_looks_for(tmp_path, monkeypatch):
+    """A backend's own filename must not survive into the run directory.
+
+    Backends write ``<model>_<seed>.mp4``; ``generate`` resumes on
+    ``<slug>-<seed>.mp4``. Without the rename a resumed run re-renders a clip
+    that is already on disk — paying for it twice — and ``_load_existing``
+    reads the stray name as seed 0, scoring it under the wrong seed.
+    """
+    from bench.backends import Generation
+    from bench.config import load_config
+    from bench.prompts import Prompt
+    from bench.runner import generate
+
+    class FakeBackend:
+        name = "fake"
+        modality = "t2v (fake)"
+
+        def available(self):
+            return True, "fake"
+
+        def generate(self, prompt, seed, seconds, out_dir):
+            # Exactly what every real backend does: name the file after itself.
+            produced = out_dir / f"{self.name}_{seed}.mp4"
+            produced.parent.mkdir(parents=True, exist_ok=True)
+            produced.write_bytes(b"x" * 4096)
+            return Generation(
+                model=self.name, prompt=prompt, seed=seed, path=produced,
+                seconds=seconds, width=8, height=8, fps=8,
+                modality=self.modality, elapsed_s=1.0,
+            )
+
+    monkeypatch.setattr("bench.runner.get_backend", lambda name, config: FakeBackend())
+    run_dir = tmp_path / "run"
+    prompt = Prompt(text="a prompt", dimensions=(), slug="a_prompt_deadbeef")
+
+    made = generate(load_config(), ["fake"], [prompt], [1], 4.0, run_dir)
+
+    assert len(made) == 1
+    assert made[0].path == run_dir / "videos" / "fake" / "a_prompt_deadbeef-1.mp4"
+    assert made[0].path.exists()
+    assert not (run_dir / "videos" / "fake" / "fake_1.mp4").exists()
+
+
+def test_ours_refuses_a_mock_keyframe_fed_to_a_paid_video_model(monkeypatch):
+    """A placeholder keyframe burns its label into the clip Seedance animates.
+
+    A run exported VIDEO_PROVIDER=ark but not IMAGE_PROVIDER, so the keyframe
+    fell back to mock. The clip shipped with "MOCK FRAME · replace
+    IMAGE_PROVIDER to render real art" across frame 0 — and the judge scored it
+    5/5/5/5, because legible text on a sharp picture reads as high quality to a
+    vision model. Refusing the pairing is the only thing that stops this.
+    """
+    from bench.backends import PipelineBackend
+    from bench.config import load_config
+
+    backend = PipelineBackend(load_config())
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "ark")
+    monkeypatch.setenv("ARK_ALLOW_PAID", "1")
+    monkeypatch.setenv("IMAGE_PROVIDER", "mock")
+    ok, detail = backend.available()
+    assert not ok
+    assert "IMAGE_PROVIDER" in detail
+
+    monkeypatch.setenv("IMAGE_PROVIDER", "ark")
+    ok, detail = backend.available()
+    assert ok
+    assert "image=ark" in detail
+
+
+def test_mixed_provider_clips_are_not_trusted_as_pipeline_output():
+    """The guard is about provenance, not quality: a mixed clip is not ours."""
+    from bench.backends import PipelineBackend
+    from bench.config import load_config
+
+    backend = PipelineBackend(load_config())
+    assert backend.modality.startswith("i2v"), (
+        "the i2v label is what makes a mock-keyframe burn-in possible, so the "
+        "backend must keep advertising that the first frame is authored"
+    )

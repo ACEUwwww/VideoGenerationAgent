@@ -121,6 +121,17 @@ def generate(
                 except Exception as exc:  # noqa: BLE001 - one clip must not sink the run
                     print(f"  FAILED {model} {prompt.slug} seed={seed}: {exc}")
                     continue
+                # Backends name their own output ``<model>_<seed>.mp4``, which
+                # is not the name this run resumes on. Left unrenamed, a
+                # resumed run sees no ``<slug>-<seed>.mp4``, renders the same
+                # clip again — paying twice — while ``_load_existing`` reads the
+                # stray file as seed 0 and scores it under the wrong seed.
+                if generation.path != target and generation.path.exists():
+                    generation.path.replace(target)
+                if not target.exists():
+                    print(f"  FAILED {model} {prompt.slug} seed={seed}: backend produced no file")
+                    continue
+                generation.path = target
                 print(f"  done {model} {prompt.slug} seed={seed} in {generation.elapsed_s:.0f}s")
                 made.append(generation)
     return made
@@ -446,17 +457,66 @@ def _load_existing(run_dir: Path, models: list[str]) -> list[Generation]:
     clips = run_dir / "clips.json"
     if clips.exists():
         out = []
+        seen: set[tuple[str, int]] = set()
         for row in json.loads(clips.read_text(encoding="utf-8")):
             if row["model"] not in models:
                 continue
+            path = run_dir / row["file"]
+            if not path.exists():
+                # clips.json is only written when a run is judged, so it
+                # describes the clips that existed at that moment. A seed
+                # rendered afterwards is on disk but absent from it, and a
+                # clip deleted since is listed but gone. Skipping only the
+                # missing ones keeps the recorded metadata for the clips that
+                # are still there.
+                continue
+            seen.add((row["model"], row["seed"]))
             stored = row["prompt"]
             out.append(Generation(
                 model=row["model"], prompt=_true_prompt(stored), seed=row["seed"],
-                path=run_dir / row["file"], seconds=row["seconds"], width=0, height=0, fps=0,
+                path=path, seconds=row["seconds"], width=0, height=0, fps=0,
                 modality=row.get("modality", ""), elapsed_s=row.get("elapsed_s", 0.0),
                 note="reused",
             ))
+        # Then add anything on disk that clips.json does not know about. Without
+        # this a run that grew a second and third seed kept judging only the
+        # first: 12 clips on disk, 5 in the cache, and the report printed a
+        # single-seed comparison without saying so.
+        out.extend(_discover(run_dir, models, manifest_prompts, skip=seen))
         return out
+
+    return _discover(run_dir, models, manifest_prompts, skip=set())
+
+
+def _discover(
+    run_dir: Path,
+    models: list[str],
+    manifest_prompts: list[dict],
+    skip: set[tuple[str, int]],
+) -> list[Generation]:
+    """Clips on disk, named ``<slug>-<seed>.mp4``, that the caller has not seen."""
+    out = []
+    for model in models:
+        for path in sorted((run_dir / "videos" / model).glob("*.mp4")):
+            # Filenames are `<slug>-<seed>.mp4`; the seed is what varies within
+            # one prompt, and it is the only part a resumed run needs.
+            try:
+                seed = int(path.stem.rsplit("-", 1)[-1])
+            except ValueError:
+                seed = 0
+            if (model, seed) in skip:
+                continue
+            slug = path.stem.rsplit("-", 1)[0]
+            prompt = next(
+                (row["text"] for row in manifest_prompts if row.get("slug") == slug),
+                slug,
+            )
+            out.append(Generation(
+                model=model, prompt=prompt, seed=seed,
+                path=path, seconds=0.0, width=0, height=0, fps=0,
+                modality="", elapsed_s=0.0, note="discovered",
+            ))
+    return out
 
     # The manifest carries the prompts the run was started with. Without it the
     # discovered prompt has to come from the filename, which holds a slug, not
