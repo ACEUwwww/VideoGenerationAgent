@@ -262,13 +262,12 @@ entry["drift_vs_anchor"] = similarity(anchor["fingerprint"], fingerprint_data)
 
 ### 5.2 字幕
 
-字幕时间在 `compose_video` 内按**编码后的时间线**重排。这不能在外层做——转场重叠会缩短总长，片头卡会整体后移，任何一处变化都会让所有台词错位。
+字幕时间在 `compose_video` 内按**编码后的时间线**重排。这不能在外层做——转场重叠会缩短总长，任何一处变化都会让所有台词错位。
 
 字号、边距、描边按 1080×1920 画布固定，字体由 `font_path()` 跨平台探测（Windows 雅黑 / macOS 苹方 / Linux Noto CJK），失败时可用 `CJK_FONT_PATH` 指定。
 
-### 5.3 片头字卡与配乐
+### 5.3 配乐
 
-片头字卡 1.2 秒，与首镜交叉淡入（`VIDEO_TITLE_CARD=1`，默认开）。
 
 BGM 用 `aloop` 循环铺底、与台词音轨 `amix`，音量 `BGM_VOLUME`（默认 0.18）。
 
@@ -368,7 +367,7 @@ curl -s http://127.0.0.1:8000/api/health/connectivity | python -m json.tool
 | `IMAGE_RETRIES` / `VIDEO_RETRIES` | 返工预算，默认各 1 次 |
 | `IMAGE_REFERENCE` | `1` 时回灌锚点关键帧，默认开 |
 | `VIDEO_WIDTH` / `VIDEO_HEIGHT` / `VIDEO_FPS` | 画布，默认 1080×1920@30 |
-| `VIDEO_TRANSITIONS` / `VIDEO_TITLE_CARD` | 转场与片头卡开关，默认开 |
+| `VIDEO_TRANSITIONS` | 转场开关，默认开 |
 | `BGM_PATH` / `BGM_VOLUME` | 配乐文件与混音音量 |
 | `CJK_FONT_PATH` / `CJK_FONT_FAMILY` | 字体自动探测失败时手动指定 |
 
@@ -403,14 +402,14 @@ workspace/projects/<project_id>/
   final/final_video.mp4  cover.png  final_video.json
 ```
 
-`final_video.json` 记录片段列表、标题、字幕行数、画布、实际时长、片头卡、BGM 路径与每条转场的应用结果。
+`final_video.json` 记录片段列表、标题、字幕行数、画布、实际时长、BGM 路径与每条转场的应用结果。
 
 ---
 
 ## 9. 测试
 
 ```bash
-.venv/bin/python -m pytest tests -q     # 56 passed
+.venv/bin/python -m pytest tests -q     # 86 passed
 ```
 
 | 文件 | 项数 | 覆盖 |
@@ -421,8 +420,9 @@ workspace/projects/<project_id>/
 | `test_recovery.py` | 7 | 心跳、僵尸回收、并发认领 |
 | `test_metrics.py` | 6 | 像素指标性质 |
 | `test_providers.py` | 6 | 付费保护、未知 provider、重试边界 |
+| `test_bench.py` | 21 | 对比工具：分数解析、维度分组、载荷构造、调用量估算 |
 
-测试断言绑定实测数值而非存在性：转场重叠缩短总时长、字幕随片头卡后移、BGM 不改变总长、judge 只发一次调用且收到全分辨率关键帧。
+测试断言绑定实测数值而非存在性：转场重叠缩短总时长、字幕重排到编码后的时间线、BGM 不改变总长、judge 只发一次调用且收到全分辨率关键帧。
 
 ---
 
@@ -477,20 +477,14 @@ bench/verify_models.sh Wan-AI/Wan2.1-T2V-1.3B-Diffusers
 
 bench/.venv/bin/python -m bench.runner --estimate  # 只算预算，不花钱
 bench/.venv/bin/python -m bench.runner \
-    --models ours cogvideox5b wan21_1_3b longlive_1_3b \
+    --models ours cogvideox5b wan21_1_3b \
     --prompts 1 --seeds 0 1 --seconds 5 \
     --dimensions imaging_quality aesthetic_quality motion_effects overall_consistency
-
-# 分段评测：本地、零成本，不需要裁判
-bench/.venv/bin/python -m bench.runner \
-    --models longlive_1_3b --stage segment --segment-seconds 5 --run-dir <run>
 ```
 
-裁判要花钱，需要 `ARK_ALLOW_PAID=1` 与 `BENCH_ALLOW_PAID=1` 同时为 1。生成和判分可分开跑（`--stage generate` / `--stage segment` / `--stage judge`），产物按维度缓存。
+裁判要花钱，需要 `ARK_ALLOW_PAID=1` 与 `BENCH_ALLOW_PAID=1` 同时为 1。生成和判分可分开跑（`--stage generate` / `--stage judge`），产物按维度缓存。
 
 `ours` 后端要求 `VIDEO_PROVIDER=ark`（mock 出的是占位片，不算竞品）。
-
-`longlive_1_3b` 是长视频基线（Wan2.1-1.3B + 自回归 KV-cache，Apache 2.0）。它需要 vendored 仓库与原生 Wan `.pth` 权重，且走子进程调用——其 requirements 锁 `diffusers==0.31.0`，与本 harness 的 0.42.1 冲突。
 
 ### 11.4 权重完整性与一个实测踩到的坑
 
@@ -519,28 +513,80 @@ bench/verify_models.sh zai-org/CogVideoX-5b --fix       # 重下损坏文件
 
 因此单镜分数比较的是各自产物质量，不是同一条流水线的高低。时长与帧率也各按模型的训练设定取整（CogVideoX 8fps、Wan 16fps），与目标时长有小幅偏差。
 
-### 11.6 本次对比的边界
+### 11.6 实测结果（2026-11-17）
+
+![同一 prompt 的判分](docs/figures/quality.png)
+
+裁判是本地 `Qwen2.5-VL-32B-Instruct`（不出网、不按次计费，权重固定所以可复现）。柱是均值，点是每个 seed。**两种各条模型的 seed 数不同，这是这一轮最重要的事实**：
+
+| 模型 | seed 数 | 原因 |
+| --- | ---: | --- |
+| `cogvideox5b` / `wan21_1_3b` / `longlive_1_3b` | 3 | 本地权重，全部跑通 |
+| `ours` | 1 | seed 1 被 Ark 内容审核拦下（`OutputVideoSensitiveContentDetected`） |
+| `openmontage_shot` | 1 | seed 1/2 报 `ModelNotOpen`（账号未开通它默认要的 2.0 模型） |
+
+所以**这张图能支撑的结论只有一条**：在同一个 prompt、同一个 5 秒目标下，本项目单条片段的判分不低于所有开源基线，且在运动效果上明显更高（5.0 vs 3.0–4.0）。它**不能**支撑"本项目平均优于 LongLive"——Wan 与 CogVideoX 的跨 seed 方差（σ 0.82–0.94）比模型间差距还大，一条片段说明不了均值。
+
+### 11.7 单片段内部稳定性
+
+![跨段一致性](docs/figures/identity.png)
+
+同一片段按 1 秒切窗，逐窗与首窗比指纹（颜色直方图 + 缩略图余弦），取最小值。这一列只看**单镜头连续片段**：
+
+| 模型 | 中位 identity | 各 seed | 检出漂移 |
+| --- | ---: | --- | --- |
+| 本项目 | 0.989 | 0.989 | 0 / 1 |
+| LongLive-1.3B | 0.814 | 0.814 / 0.773 / 0.819 | 0 / 3 |
+| OpenMontage 镜头段 | 0.627 | 0.627 | 1 / 1（第 3 秒起） |
+| Wan2.1-1.3B | 0.779 | 0.779 / −0.794 / 0.791 | 1 / 3 |
+| CogVideoX-5B | 0.711 | 0.711 / −0.263 / 0.801 | 1 / 3 |
+
+### 11.8 长序列：这是判分维度覆盖不到的地方
+
+![长序列稳定性](docs/figures/longform.png)
+
+Video-Bench 的九个维度没有一个是测"长"的：全是帧级质量与文图对齐，跨镜头身份漂移、叙事推进、机位连续性一条都没有。所以这里不用裁判分，用同一套本地几何指标。
+
+对比对象是**本项目 32.7 秒、8 个镜头的成片**和 **LongLive-1.3B 的 30 秒连续单镜头**。两者都按 1 秒切窗：
+
+| | 本项目（镜头内比） | LongLive（全程比） |
+| --- | ---: | ---: |
+| identity 中位数 | **0.972** | 0.763 |
+| 最低单窗 | 0.588 | 0.674 |
+| 测量点数 | 9 | 29 |
+
+三件必须说明的事，否则这张图会被误读：
+
+1. **锚点不同**。本项目的每个窗口与**它所属镜头的首帧**比；LongLive 与**整个片段的首帧**比。切镜必然改变画面，拿全片首帧当锚点等于在测剪辑而不是测漂移——这个错误一开始把本项目算成 `identity_min = -0.83`，是纯粹的度量假象。
+2. **跨切点的窗口被丢弃**。xffade 转场有真实重叠，实测切点在 4.8 / 8.83 / 12.83 / 16.87 / 20.87 / 24.9 / 28.7 秒，不是分镜表上的 4 秒整数倍。保留这些窗口会得到 0.06 之类的读数，那是叠化把两个镜头混合了。
+3. **片头卡被排除**。前 1.2 秒是黑底字幕卡，与第一个镜头毫无共同结构，会拉到 0.37。
+
+结论要克制地写：**LongLive 的衰减是单调的**（0.93 → 0.67，窗口滑离条件帧越远越差），而本项目的漂移在每个镜头开头被首帧锚定重置。这是两种工作流的**结构性差异**，不是"本项目比 LongLive 好 27%"——两者的测量基准不同，只能比形状，不能比绝对值。
+
+### 11.9 判分维度覆盖不到的交付能力
+
+![交付能力](docs/figures/capability.png)
+
+这一栏不是分数。开源基线**做不到**多镜头成片，所以没有 1-5 分可打；表里是从产物文件里读出来的事实（容器时长、`state.json` 的镜头数、工程目录里的音频与字幕）。
+
+要证明"workflow 优于 workflow"，这一栏才是主证据：`ours` 与 `openmontage_shot` 的差别不在底模（见下），而在这张表——剧本、分镜、角色一致性、逐镜配音、字幕、BGM、镜头间首尾帧衔接。
+
+### 11.10 已有的对照，以及它的两处硬伤
+
+`openmontage_shot` 是设计上的控制变量：同一个 prompt、同一个 Ark 出片工具，只有"前面有没有编排层"不同。但这一轮它的证据是**不完整**的，必须写在报告里而不是口头：
+
+- **底模并非严格相同**。`ours` 走 `doubao-seedance-1-0-pro-fast-251015`（`.env` 的 `ARK_VIDEO_MODEL`），而 `bench/backends.py` 当时**没有传 model**，OpenMontage 用它自己的默认值 `doubao-seedance-2-0-260128`。提交说明里"同一条 Seedance 底模"这句在当时的代码下不成立。已修：现在显式传 `ARK_VIDEO_MODEL`，两侧才真正同底模。
+- **只有 1 个 seed**。补 seed 1/2 时两个都失败（`ModelNotOpen`），所以它无法和 `ours` 的 1 个 seed 做任何有统计意义的比较。
+
+所以这一轮**没有**跨 workflow 的分数级结论。能说的是结构性事实（11.8、11.9），以及一条已经被数据证伪的方向：我原本准备写"本项目在运动效果上优于 OpenMontage"，但两者 seed 数都是 1，5.0 vs 3.0 只是单条片段的差，不能当结论。
+
+### 11.11 本次对比的边界
 
 - 9 个维度分两组，1-5 与 1-3 **不可相加或平均**，报告分两栏。
-- 冒烟规模下每模型每 prompt 只有一两条片段，单条分数不是模型的稳定水平。
+- 每模型每 prompt 的 seed 数是 1–3 条且不一致（见 11.6）。单条分数不能当作模型的稳定水平。
 - 没有做人工对齐复现；只用 Video-Bench 的裁判与维度，没有复现论文的人类偏好相关性。
-
-### 11.7 分段评测
-
-单一总分看不见长视频是怎么坏的。`bench/segments.py` 把片段切成固定窗口，分三层量：
-
-| 层 | 内容 | 是否花钱 |
-|---|---|---|
-| 段内质量 | 每秒运动、闪烁、亮度、饱和度 | 否 |
-| 跨段一致性 | 与**首段**比（非链式），结构 + 色彩 | 否 |
-| 全局 | 漂移起点、最差转场、运动离散度 | 否 |
-
-锚定首段而非上一段是关键：链式比较下每步只差一点，累积漂移会被看成稳定。
-
-实测一条 30 秒 LongLive 片段：切 6 段后一致性 0.941 → 0.702 单调下滑，饱和度 122 → 95，
-**第 4 段（20 秒处）检出漂移**。这些数字被平均成一个总分后全部消失。
-
-用固定窗口而非镜头边界：镜头边界是被评 workflow 自己的决定，不该在评分前替它定好。
+- 本地 32B 裁判与论文原版 GPT-4o 不是同一个裁判，绝对分不能和已发表的榜单直接比。
+- **一条被剔除的脏数据**：`ours` 的 seed 2 曾经入选，后来发现它的关键帧是 `IMAGE_PROVIDER=mock` 画的占位图，画面上烧着 "MOCK FRAME" 字样，却被裁判打了 5/5/5/5。现已隔离且不参与任何统计；根因（脚本漏导出 `IMAGE_PROVIDER`）与"i2v 后端遇到 mock 关键帧必须拒绝"的守卫已修。
 
 ---
 
@@ -550,13 +596,13 @@ bench/verify_models.sh zai-org/CogVideoX-5b --fix       # 重下损坏文件
 
 - **视频侧无参考图回灌**。`reference_image` 角色是 Seedance 2.0 及以上才有的能力；首尾帧（`first_frame` + `last_frame`）在 1.0 pro 上就有，但 **1.0 pro-fast 不支持**，选 pro-fast 时拼接会退化成只按首帧生成，运行时会写一条告警。
 - **单进程后台任务**。`BackgroundTasks` + `asyncio.to_thread`，无任务队列、无主动取消。僵死运行能被心跳回收，但正在跑的生成任务无法中断（Seedance 单次 60-90 秒，只能等返回）。
-- **字幕只覆盖台词**，没有旁白。片头卡是 ffmpeg 绘制，不经过 LLM。
+- **字幕只覆盖台词**，没有旁白，也没有片头字卡。
 - **`scene_consistency` 只适合同机位漂移**。跨景别已自动跳过，但它不表达「同一场景不同构图」的语义一致性——那需要视觉模型判断。
 - **视觉质检分两级**。逐镜按 Video-Bench 七维打分；成片后再把全部关键帧按播放顺序一次性交给 MLLM，判 `story_coherence` / `continuity` / `pacing`。序列级只看关键帧，不看动态。
 
 ---
 
-## 12. 后续路线
+## 13. 后续路线
 
 1. **视频侧参考图**：开通 Seedance 2.0+，把锚点关键帧作为 `reference_image` 传给视频模型，压制视频段的人物漂移。
 2. **多角色音色**：现在所有台词用同一音色。按角色的 `voice` 字段选择不同音色，需要先拿到可用音色 ID 列表。
