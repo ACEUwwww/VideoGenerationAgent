@@ -37,6 +37,24 @@ RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 _LAST_FRAME_PATTERNS = ("seedance-2", "seedance-1-0-pro-2")
 
 
+class ContentModerationError(RuntimeError):
+    """Ark refused the rendered clip at output moderation.
+
+    Distinguished from every other task failure because it is the one case the
+    pipeline handles without ending the episode. Observed once for real: a
+    1135 s run was thrown away whole when a single shot came back
+    ``OutputVideoSensitiveContentDetected``, and every other shot in that
+    episode had already been rendered and paid for. The clip is rejected on its
+    pixels, so the same request would be re-billed and rejected again — retrying
+    is not the answer, skipping the shot is.
+    """
+
+
+# Substring match on the provider's error block. Ark reports the code inside a
+# free-form string, and the code is the only stable part of it.
+_MODERATION_MARKER = "SensitiveContentDetected"
+
+
 def supports_last_frame(model: str) -> bool:
     """Whether this Seedance model accepts a ``last_frame`` role."""
     name = (model or "").lower()
@@ -197,6 +215,9 @@ class ArkVideoProvider:
                     video_url = body["content"]["video_url"]
                     break
                 if status in ("failed", "cancelled"):
+                    error = str(body.get("error"))
+                    if _MODERATION_MARKER in error:
+                        raise ContentModerationError(f"Ark video task {task_id} {status}: {error}")
                     raise RuntimeError(f"Ark video task {task_id} {status}: {body.get('error')}")
             if not video_url:
                 raise RuntimeError(

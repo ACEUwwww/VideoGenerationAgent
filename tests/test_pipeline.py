@@ -384,3 +384,58 @@ def test_image_phase_finishes_before_any_clip_is_rendered(project):
     image_actions = [i for i, kind in enumerate(kinds) if kind == "MCP.generate_image"]
     assert image_actions, "image phase should have run"
     assert max(image_actions) < first_video, "all keyframes must precede the first clip"
+
+
+def test_a_moderated_clip_is_skipped_instead_of_killing_the_episode(project, monkeypatch):
+    """One rejected shot must not discard the shots that already rendered.
+
+    Observed for real: a 1135 s run died whole when a single clip came back
+    ``OutputVideoSensitiveContentDetected``. Every other clip in that episode
+    had been rendered and paid for, and the pipeline had no branch for the
+    error, so the exception unwound the entire run.
+    """
+    from agent.nodes import video_nodes
+    from mcp_servers.providers.ark_media import ContentModerationError
+
+    real = video_nodes.tools.generate_video
+
+    def reject_one(*args, **kwargs):
+        shot_id = args[3]
+        if shot_id.endswith("002"):
+            raise ContentModerationError("Ark video task cgt-x failed: OutputVideoSensitiveContentDetected")
+        return real(*args, **kwargs)
+
+    project_id, state = project
+    monkeypatch.setattr(video_nodes.tools, "generate_video", reject_one)
+    final = run_agent(state)
+
+    # The episode still completes, one shot short.
+    assert final.get("final_video_path")
+    skipped = [s for s in final["shots"] if s.get("status") == "video_skipped"]
+    assert len(skipped) == 1
+    assert skipped[0]["id"].endswith("002")
+    assert skipped[0].get("video_path") == ""
+    assert "SensitiveContentDetected" in skipped[0]["video_skip_reason"]
+
+    # Every other clip is untouched: the rejection is isolated, not contagious.
+    rendered = [s for s in final["shots"] if s.get("video_path")]
+    assert len(rendered) == len(final["shots"]) - 1
+
+
+def test_the_skip_route_bypasses_qa_and_keyframe_extraction(project):
+    """A skipped shot has no pixels, so it must not reach evaluate_clip.
+
+    The state handed to the video node is the one the planner produced; a fresh
+    project has no shots yet, which is why the fixture runs the agent first.
+    """
+    from agent.nodes.video_nodes import clip_was_generated
+
+    project_id, state = project
+    final = run_agent(state)
+    assert final["shots"]
+
+    final["current_shot_index"] = 0
+    assert clip_was_generated(final) == "generated"
+
+    final["shots"] = [dict(final["shots"][0], video_path="", status="video_skipped")]
+    assert clip_was_generated(final) == "skipped"

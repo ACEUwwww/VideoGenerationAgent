@@ -16,6 +16,7 @@ from agent.nodes.video_nodes import (
     advance_shot,
     call_evaluate_video,
     call_generate_video,
+    clip_was_generated,
     evaluate_clip_multidim,
     generate_video_prompt,
     has_more_keyframes,
@@ -70,7 +71,15 @@ def build_graph():
     )
     graph.add_edge("start_video_phase", "generate_video_prompt")
     graph.add_edge("generate_video_prompt", "generate_video")
-    graph.add_edge("generate_video", "evaluate_video")
+    # A clip rejected by output moderation has no pixels to score and no track
+    # to lay under it, so it goes straight to the next shot. Before this edge
+    # existed, one rejected clip raised out of the whole run and discarded the
+    # episode — every other shot in it had already been rendered and paid for.
+    graph.add_conditional_edges(
+        "generate_video",
+        clip_was_generated,
+        {"skipped": "advance_shot", "generated": "evaluate_video"},
+    )
     graph.add_conditional_edges(
         "evaluate_video",
         should_retry_video,

@@ -40,11 +40,26 @@
 
 | 事件 | 证据 | 影响 |
 | --- | --- | --- |
-| 第 3 条成片因内容审核整集失败 | brief 0 / repeat 2，跑 1135s 后 `Ark video task cgt-20261117185942-mglj9 failed: OutputVideoSensitiveContentDetected`。`agent/` 与 `mcp_servers/` 中**没有**对该错误码的处理分支，失败直接冒泡到整集 | 本项目 9 条计划里已有 1 条作废，且该条的已付费渲染全部丢弃；OpenMontage 侧尚未出现同类事件（样本仅 1 条，不能据此说它更稳） |
+| 第 3 条成片因内容审核整集失败 | brief 0 / repeat 2，跑 1135s 后 `Ark video task cgt-20261117185942-mglj9 failed: OutputVideoSensitiveContentDetected`。当时的 `agent/` 与 `mcp_servers/` 中**没有**对该错误码的处理分支，失败直接冒泡到整集 | 本项目 9 条计划里已有 1 条作废，且该条的已付费渲染全部丢弃；OpenMontage 侧尚未出现同类事件（样本仅 1 条，不能据此说它更稳）。**已修复**（见下条） |
 | **Ark 账号欠费，付费侧整体中断** | 2026-11-17 19:47 起，本项目批次连续 5 条在开工 29s 内返回 `Ark HTTP 403 {"code":"AccountOverdueError"}`（brief1 rep1/rep2、brief2 rep0/rep1/rep2） | **不是质量或编排问题，是账户余额问题**。本项目有效样本停在 3/9；OpenMontage 在同一账号下，剩余镜头预计受同一限制。需充值后才能补齐；本轮结论只能基于已有的 3 对 2 |
 | 判定欠费发生的时点 | OpenMontage 已完成的两条任务时间戳为 19:44:58 / 19:45:39，早于欠费；本项目失败从 19:47 起。因此"OpenMontage 成功、本项目失败"的差异来自**时间先后**，不能读成两套 workflow 的可靠性差异 | 报告不得据此比较两侧成功率 |
 
 这条不粉饰：单镜审核失败会毁掉整集，是本项目编排层的真实缺陷；欠费则是外部阻塞，与编排无关。两者性质不同，报告里分开写。本轮**不能**用成功率比较两个 workflow。
+
+### 修复：审核失败隔离到单镜（2026-11-18）
+
+`ark_media.py` 把 `SensitiveContentDetected` 识别为 `ContentModerationError`，`call_generate_video`
+捕获后把该镜标 `video_skipped`，`clip_was_generated` 让状态机直接跳到下一镜，绕开质量评估
+（没有像素可评）与配音（没有画面可配）。`compose_video` 本就丢弃没有 `video_path` 的镜头，
+因此成片少一镜，而不是整集不产出。
+
+不重试是刻意的：输出审核按像素判定，同一请求重发会再计费再被拒。
+
+覆盖：`tests/test_pipeline.py::test_a_moderated_clip_is_skipped_instead_of_killing_the_episode`
+（注入一条审核失败，断言其余镜头全部保留、成片仍产出）与
+`test_the_skip_route_bypasses_qa_and_keyframe_extraction`。全量 `pytest tests` → 116 passed / 7 skipped。
+
+**本轮数据早于此修复**，报告里记录的失败仍按修复前的行为解读，不能用修复后的能力去解释旧结果。
 
 ## 已定位的供应商缺陷（在 bench 层绕开，未改 vendored 源码）
 

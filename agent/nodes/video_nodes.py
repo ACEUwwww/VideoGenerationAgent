@@ -20,7 +20,7 @@ from mcp_servers import keyframe_memory
 from mcp_servers import video_tools_server as tools
 from mcp_servers.evaluators import evaluate_video as qa_video
 from mcp_servers.providers import get_vision_judge
-from mcp_servers.providers.ark_media import supports_last_frame
+from mcp_servers.providers.ark_media import ContentModerationError, supports_last_frame
 from mcp_servers.videobench_eval import evaluate_clip
 
 
@@ -124,16 +124,32 @@ def call_generate_video(state: AgentState) -> AgentState:
         {"shot_id": shot["id"], "provider": media.video_provider, "duration_s": shot["duration_s"],
          "join": join, "first_frame": first_frame, "last_frame": authored_last or "none"},
     )
-    result = tools.generate_video(
-        first_frame,
-        shot["motion_prompt"],
-        state["project_id"],
-        shot["id"],
-        duration_s=shot["duration_s"],
-        caption=shot.get("description", ""),
-        seed=shot["index"] + 1,
-        last_frame_path=authored_last,
-    )
+    try:
+        result = tools.generate_video(
+            first_frame,
+            shot["motion_prompt"],
+            state["project_id"],
+            shot["id"],
+            duration_s=shot["duration_s"],
+            caption=shot.get("description", ""),
+            seed=shot["index"] + 1,
+            last_frame_path=authored_last,
+        )
+    except ContentModerationError as exc:
+        # Output moderation rejects the pixels, so the same request would be
+        # re-billed and rejected again. Skipping the shot is the only recovery:
+        # one rejected clip used to discard the whole episode, including every
+        # shot that had already rendered and been paid for.
+        add_event(
+            state,
+            "Observation",
+            f"{shot['id']} 被输出审核拒绝，跳过该镜，其余镜头继续。",
+            {"shot_id": shot["id"], "error": str(exc)},
+        )
+        return update_current_shot(
+            state,
+            {"status": "video_skipped", "video_path": "", "video_skip_reason": str(exc)},
+        )
     if media.video_provider != "mock":
         track_media_usage(state, "generate_video", media.video_provider, result.get("usage"))
     add_event(
@@ -144,6 +160,16 @@ def call_generate_video(state: AgentState) -> AgentState:
     )
     state["generated_video_path"] = result["video_path"]
     return update_current_shot(state, {"status": "video_generated", "video_path": result["video_path"]})
+
+
+def clip_was_generated(state: AgentState) -> str:
+    """Route a moderated shot past QA and straight to the next shot.
+
+    There is no clip to score, and ``evaluate_clip`` extracts a keyframe from
+    it. ``compose_video`` already drops any shot without a ``video_path``, so
+    the episode is delivered one shot short instead of not at all.
+    """
+    return "skipped" if not current_shot(state).get("video_path") else "generated"
 
 
 def call_evaluate_video(state: AgentState) -> AgentState:
