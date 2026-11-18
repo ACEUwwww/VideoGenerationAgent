@@ -442,12 +442,16 @@ class OpenMontageBackend:
         # picks the fallback; an explicit model id wins over it.
         model_id = os.environ.get("ARK_VIDEO_MODEL", "")
         self.model_id = model_id
+        # The resolution is read from the same variable the pipeline reads, not
+        # hardcoded. A hardcoded 720p here measured 704x1248 against `ours`
+        # at 480x864 — 2.1x the pixels — so every visual dimension compared two
+        # different output budgets and called the difference workflow quality.
         result = tool.execute({
             "operation": "text_to_video",
             "prompt": prompt,
             "duration": int(max(4, round(seconds))),
             "aspect_ratio": "9:16",
-            "resolution": "720p",
+            "resolution": os.environ.get("ARK_VIDEO_RESOLUTION", "720p"),
             "output_path": str(target),
             "seed": seed,
             # Ark bills by actual usage; this figure only feeds the tool's own

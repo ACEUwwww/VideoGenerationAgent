@@ -66,10 +66,15 @@ def _anchor_reference(state: AgentState, root, media) -> str:
     """Image to condition this keyframe on, or "" when there is nothing yet.
 
     The keyframe-memory anchor is written during the video phase, so during the
-    image phase (which now runs first and in full) it is always empty. Falling
-    back to the previous shot's accepted keyframe keeps faces, wardrobe and
-    colour grade continuous: shot N is drawn from shot N-1, which is exactly the
-    frame shot N-1's clip ends on.
+    image phase (which runs first and in full) it is always empty. The anchor is
+    therefore shot 1's own keyframe.
+
+    Every later keyframe is drawn from that one anchor, never from the previous
+    shot's keyframe. Chaining N from N-1 compounds the model's small errors and
+    a real run drifted far enough that the courier's blue uniform turned into a
+    yellow hi-vis vest by shot 5. Re-deriving each frame from the same reference
+    keeps drift from accumulating, and the per-shot scorer measures against that
+    same anchor so any remaining drift is still visible as a number.
     """
     if not media.image_reference or media.image_provider == "mock":
         return ""
@@ -77,11 +82,13 @@ def _anchor_reference(state: AgentState, root, media) -> str:
     if entry and (root / entry["path"]).exists():
         return entry["path"]
     shots = state.get("shots") or []
-    index = state.get("current_shot_index", 0)
-    if index <= 0 or index - 1 >= len(shots):
+    if not shots:
         return ""
-    previous = shots[index - 1].get("image_path") or ""
-    return previous if previous and (root / previous).exists() else ""
+    anchor = shots[0].get("image_path") or ""
+    if not anchor or not (root / anchor).exists():
+        return ""
+    # Shot 1 has nothing before it and must not condition on itself.
+    return anchor if state.get("current_shot_index", 0) > 0 else ""
 
 
 def call_generate_image(state: AgentState) -> AgentState:

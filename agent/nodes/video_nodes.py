@@ -52,16 +52,41 @@ def generate_video_prompt(state: AgentState) -> AgentState:
     )
 
 
+def _previous_tail_frame(state: AgentState, shot: dict) -> str:
+    """Real last frame of the clip that plays immediately before this one.
+
+    Used as this clip's first frame, so the cut lands on an identical picture
+    and the two clips splice without a jump. This is the only joining mechanism
+    available on models that reject the ``last_frame`` role (Seedance 1.0
+    pro-fast does), and it needs nothing but a first frame.
+
+    The trade-off is real: each clip is drawn from the previous clip's output,
+    so it inherits that clip's small errors. It is still the right trade against
+    a hard cut, and drift is now bounded from the other side too: the keyframe
+    each clip is meant to start from is re-drawn from one fixed anchor, so the
+    authored reference never walks away over a long sequence.
+    """
+    if not get_settings().media.first_last_frame:
+        return ""
+    index = shot.get("index", 0)
+    if index <= 0:
+        return ""
+    previous = state["shots"][index - 1]
+    if not previous.get("video_path"):
+        return ""
+    root = tools.ensure_project_dirs(state["project_id"])
+    target = root / "keyframes" / f"{previous['id']}_last.png"
+    keyframe_memory.extract_last_frame(root / previous["video_path"], target)
+    return str(target.relative_to(root))
+
+
 def _next_keyframe(state: AgentState, shot: dict) -> str:
-    """Keyframe of the following shot, served as this clip's final frame.
+    """Authored keyframe of the following shot, served as this clip's last frame.
 
-    Shot N runs keyframe[N] -> keyframe[N+1]. Shot N+1 renders from that same
-    image as its first frame, so the cut lands on an identical picture and the
-    two clips splice without a jump. The last shot has nothing to land on and
-    ends free.
-
-    This only works because the image phase finishes every keyframe before the
-    video phase starts; when the clip is rendered, keyframe[N+1] already exists.
+    Shot N runs keyframe[N] -> keyframe[N+1]. Both ends are drawn by the image
+    model from the bible's appearance anchors, so drift cannot accumulate: every
+    clip returns to an authored picture. Requires a model that accepts the
+    ``last_frame`` role (Seedance 2.x / 1.0 pro).
     """
     if not get_settings().media.first_last_frame:
         return ""
@@ -69,8 +94,7 @@ def _next_keyframe(state: AgentState, shot: dict) -> str:
     index = shot.get("index", 0)
     if index + 1 >= len(shots):
         return ""
-    following = shots[index + 1]
-    path = following.get("image_path") or ""
+    path = shots[index + 1].get("image_path") or ""
     if not path:
         return ""
     return path if (tools.ensure_project_dirs(state["project_id"]) / path).exists() else ""
@@ -79,33 +103,36 @@ def _next_keyframe(state: AgentState, shot: dict) -> str:
 def call_generate_video(state: AgentState) -> AgentState:
     shot = current_shot(state)
     media = get_settings().media
-    last_frame = _next_keyframe(state, shot)
+    authored_last = ""
+    first_frame = shot["image_path"]
+    join = "authored"
+
+    if media.video_provider == "ark" and not supports_last_frame(media.ark_video_model):
+        # pro-fast rejects the last_frame role (task_type flf2v), so the clip is
+        # joined by starting from the previous clip's real tail frame instead.
+        join = "tail-to-head"
+        tail = _previous_tail_frame(state, shot)
+        if tail:
+            first_frame = tail
+    else:
+        authored_last = _next_keyframe(state, shot)
+
     add_event(
         state,
         "Action",
         "MCP.generate_video",
         {"shot_id": shot["id"], "provider": media.video_provider, "duration_s": shot["duration_s"],
-         "last_frame": last_frame or "none"},
+         "join": join, "first_frame": first_frame, "last_frame": authored_last or "none"},
     )
-    # A pro-fast model silently drops last_frame and renders first-frame-only,
-    # which looks exactly like a working run until the cuts visibly jump. Say so
-    # instead of letting the config degrade quietly.
-    if last_frame and media.video_provider == "ark" and not supports_last_frame(media.ark_video_model):
-        add_event(
-            state,
-            "Observation",
-            f"{media.ark_video_model} 不支持首尾帧，本镜只按首帧生成，拼接会跳。改用 1.0 pro 或 2.x。",
-            {"model": media.ark_video_model, "last_frame_dropped": last_frame},
-        )
     result = tools.generate_video(
-        shot["image_path"],
+        first_frame,
         shot["motion_prompt"],
         state["project_id"],
         shot["id"],
         duration_s=shot["duration_s"],
         caption=shot.get("description", ""),
         seed=shot["index"] + 1,
-        last_frame_path=last_frame,
+        last_frame_path=authored_last,
     )
     if media.video_provider != "mock":
         track_media_usage(state, "generate_video", media.video_provider, result.get("usage"))

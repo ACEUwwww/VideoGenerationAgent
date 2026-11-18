@@ -144,23 +144,19 @@ def test_transitions_overlap_shortens_the_timeline(project_root, fake_llm, monke
     shots = final["shots"]
     meta = json.loads((project_root / state["project_id"] / "final" / "final_video.json").read_text(encoding="utf-8"))
     planned = sum(float(shot["duration_s"]) for shot in shots)
-    # Title card adds, each non-hard-cut boundary subtracts its overlap.
+    # Each non-hard-cut boundary subtracts its overlap; there is no title card.
     overlaps = {"fade": 0.40, "fadewhite": 0.25, "fadeblack": 0.30}
     applied = [t["applied"] for t in meta["transitions"]]
-    # The title card cross-fades into the first shot, which is one more overlap.
-    if meta.get("title_card_transition"):
-        applied.append(meta["title_card_transition"])
     total_overlap = sum(overlaps.get(kind, 0.0) for kind in applied)
-    card = 1.2 if meta["title_card"] else 0.0
-    expected = planned + card - total_overlap
+    expected = planned - total_overlap
     assert abs(meta["duration_s"] - expected) < 0.35
     facts = media_facts(project_root / state["project_id"] / final["final_video_path"])
     assert abs(facts["duration_s"] - meta["duration_s"]) < 0.35
 
 
-def test_subtitles_shift_with_the_title_card(project_root, fake_llm):
-    """Subtitle times are re-based onto the encoded timeline; a prepended card
-    must not leave dialogue sitting before its shot."""
+def test_subtitles_are_rebased_onto_the_encoded_timeline(project_root, fake_llm):
+    """Subtitle times are relative to each shot and must be shifted onto the
+    encoded timeline, where transitions have already eaten their overlap."""
     state = project_store.load_state(project_store.create_project("字幕位移", "电影感", 2)["project_id"])
     state["status"] = "running"
     final = run_agent(state)
@@ -320,29 +316,48 @@ def test_sequence_judge_absent_without_a_judge():
     assert result["score"] is None
 
 
-def test_last_frame_comes_from_the_next_keyframe(project):
-    """Shot N runs keyframe[N] -> keyframe[N+1].
+def test_tail_to_head_join_reuses_the_previous_clip(project):
+    """The cut between two clips must land on an identical picture.
 
-    Using the previous clip's tail frame would make every clip evolve towards
-    the picture that already played, which is the opposite of splicing. The
-    chain must therefore be forward-looking: the next shot's keyframe, which
-    its own clip then starts from.
+    Shot N+1 starts from the real last frame of clip N, so the boundary is not
+    a jump. This is the branch pro-fast needs: it rejects the last_frame role
+    outright, so the join has to be built on the head side.
     """
+    from agent.nodes.video_nodes import _previous_tail_frame
+
     project_id, state = project
     final = run_agent(state)
     shots = final["shots"]
     assert len(shots) >= 2
 
     root = project_store.project_dir(project_id)
-    for shot in shots[:-1]:
-        following = shots[shot["index"] + 1]
-        assert following["image_path"], "the next keyframe must already exist"
-        assert (root / following["image_path"]).exists()
+    joined = dict(shots[1])
+    assert joined.get("video_path"), "mock clip 1 should exist"
 
+    tail = _previous_tail_frame(final, joined)
+    assert tail, "clip 2 must be joinable to clip 1"
+    assert tail.endswith(f"{shots[0]['id']}_last.png")
+    assert (root / tail).exists() and (root / tail).stat().st_size > 1000
+
+    # The first clip has nothing before it to be joined to.
+    assert _previous_tail_frame(final, shots[0]) == ""
+
+
+def test_authored_join_targets_the_next_keyframe(project):
+    """The other branch: an authored last frame drawn from the next keyframe.
+
+    Both ends are then authored pictures, so drift cannot accumulate across the
+    sequence. Available only on models that accept the last_frame role.
+    """
+    from agent.nodes.video_nodes import _next_keyframe
+
+    project_id, state = project
+    final = run_agent(state)
+    shots = final["shots"]
+
+    assert _next_keyframe(final, shots[0]) == shots[1]["image_path"]
     # The last shot has no successor to land on.
-    last = shots[-1]
-    payload = (root / "videos" / f"{last['id']}.json").read_text(encoding="utf-8")
-    assert "last_frame_path" not in payload or not payload["last_frame_path"]
+    assert _next_keyframe(final, shots[-1]) == ""
 
 
 def test_image_phase_finishes_before_any_clip_is_rendered(project):

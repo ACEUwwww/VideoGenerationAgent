@@ -195,8 +195,6 @@ TRANSITIONS: dict[str, tuple[str | None, float]] = {
     "硬切": (None, 0.0),
     "cut": (None, 0.0),
 }
-TITLE_CARD_SECONDS = 1.2
-TITLE_CARD_TRANSITION = ("fade", 0.40)
 
 
 def _transition_for(name: str | None, enabled: bool) -> tuple[str | None, float]:
@@ -207,35 +205,6 @@ def _transition_for(name: str | None, enabled: bool) -> tuple[str | None, float]
         if label in str(name):
             return spec
     return None, 0.0
-
-
-def _make_title_card(root: Path, media, title: str, subtitle: str) -> Path:
-    """A short 9:16 card carrying the episode title over a silent audio bed."""
-    target = root / "videos" / "_title_card.mp4"
-    font = _escape_filter_path(font_path())
-    filters = (
-        f"drawtext=fontfile='{font}':text='{_escape_drawtext(title)[:20]}':fontcolor=white"
-        f":fontsize={int(media.width * 0.11)}:x=(w-text_w)/2:y=(h-text_h)/2"
-        f":borderw=6:bordercolor=black@0.85"
-    )
-    if subtitle:
-        filters += (
-            f",drawtext=fontfile='{font}':text='{_escape_drawtext(subtitle)[:26]}'"
-            f":fontcolor=white@0.82:fontsize={int(media.width * 0.05)}"
-            f":x=(w-text_w)/2:y=(h-text_h)/2+{int(media.width * 0.13)}"
-        )
-    run([
-        ffmpeg_bin(), "-y",
-        "-f", "lavfi",
-        "-i", f"color=c=0x0b0d18:s={media.width}x{media.height}:d={TITLE_CARD_SECONDS:.3f}:r={media.fps}",
-        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-        "-vf", filters,
-        "-t", f"{TITLE_CARD_SECONDS:.3f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
-        "-c:a", "aac", "-ar", "44100", "-ac", "2",
-        "-pix_fmt", "yuv420p", str(target),
-    ])
-    return target
 
 
 def _combine(previous: Path, incoming: Path, out: Path, kind: str | None, overlap: float, elapsed: float) -> None:
@@ -303,16 +272,10 @@ def compose_video(
         run(args)
         normalised.append(out)
 
-    # Build the segment list: optional title card, then one per shot.
+    # One segment per shot. There is no title card: ffmpeg's drawtext cannot
+    # wrap a sentence, so the episode logline ran off both edges of the canvas
+    # and the opening frame of every episode carried broken text.
     segments: list[dict] = []
-    if media.title_card and (title or ""):
-        segments.append(
-            {
-                "path": _make_title_card(root, media, title, ""),
-                "transition": TITLE_CARD_TRANSITION if media.transitions else (None, 0.0),
-                "lines": [],
-            }
-        )
     for position, clip in enumerate(clips):
         segments.append(
             {
@@ -400,7 +363,7 @@ def compose_video(
         path.unlink(missing_ok=True)
 
     # A clip's transition describes the boundary that follows it, so the last
-    # clip contributes none. Segment indices are offset by the title card.
+    # clip contributes none.
     offset = len(segments) - len(clips)
     transitions = [
         {
@@ -418,14 +381,6 @@ def compose_video(
             "subtitle_lines": len(placed),
             "canvas": f"{media.width}x{media.height}@{media.fps}",
             "duration_s": round(total_duration, 3),
-            "title_card": bool(media.title_card and title),
-            # The card itself cross-fades into the first shot, which is an
-            # overlap on the timeline just like any clip boundary.
-            "title_card_transition": (
-                segments[0]["transition"][0]
-                if len(segments) > len(clips) and segments[0]["transition"][0]
-                else ""
-            ),
             "bgm": str(bgm) if bgm else "",
             "transitions": transitions,
         },
