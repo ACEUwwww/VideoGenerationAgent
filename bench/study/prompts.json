@@ -1,0 +1,110 @@
+[
+  {
+    "index": 242,
+    "primary": "overall_consistency",
+    "text": "Close up of grapes on a rotating table.",
+    "dimensions": [
+      "overall_consistency",
+      "aesthetic_quality",
+      "imaging_quality"
+    ]
+  },
+  {
+    "index": 243,
+    "primary": "overall_consistency",
+    "text": "Turtle swimming in ocean.",
+    "dimensions": [
+      "overall_consistency",
+      "aesthetic_quality",
+      "imaging_quality"
+    ]
+  },
+  {
+    "index": 244,
+    "primary": "overall_consistency",
+    "text": "A storm trooper vacuuming the beach.",
+    "dimensions": [
+      "overall_consistency",
+      "aesthetic_quality",
+      "imaging_quality"
+    ]
+  },
+  {
+    "index": 245,
+    "primary": "overall_consistency",
+    "text": "A panda standing on a surfboard in the ocean in sunset.",
+    "dimensions": [
+      "overall_consistency",
+      "aesthetic_quality",
+      "imaging_quality"
+    ]
+  },
+  {
+    "index": 0,
+    "primary": "action",
+    "text": "A person is marching",
+    "dimensions": [
+      "action",
+      "temporal_consistency",
+      "motion_effects"
+    ]
+  },
+  {
+    "index": 1,
+    "primary": "action",
+    "text": "A person is roller skating",
+    "dimensions": [
+      "action",
+      "temporal_consistency",
+      "motion_effects"
+    ]
+  },
+  {
+    "index": 78,
+    "primary": "color",
+    "text": "A red bicycle",
+    "dimensions": [
+      "color"
+    ]
+  },
+  {
+    "index": 79,
+    "primary": "color",
+    "text": "A green bicycle",
+    "dimensions": [
+      "color"
+    ]
+  },
+  {
+    "index": 333,
+    "primary": "scene",
+    "text": "Alley",
+    "dimensions": [
+      "scene"
+    ]
+  },
+  {
+    "index": 334,
+    "primary": "scene",
+    "text": "Amusement park",
+    "dimensions": [
+      "scene"
+    ]
+  },
+  {
+    "index": 163,
+    "primary": "object_class",
+    "text": "A person",
+    "dimensions": [
+      "object_class"
+    ]
+  },
+  {
+    "index": 164,
+    "primary": "object_class",
+    "text": "A bicycle",
+    "dimensions": [
+      "object_class"
+    ]
+  }
+]
