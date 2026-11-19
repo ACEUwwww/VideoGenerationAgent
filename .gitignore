@@ -29,5 +29,10 @@ bench/models/
 bench/.venv/
 bench/data/
 bench/results/
+# The write-up is a paper artifact, not a run output: it is what a reader is
+# meant to find, so it is versioned while the renders it cites stay local.
+!bench/results/
+bench/results/*
+!bench/results/tier3a_report.md
 bench/_smoke/
 bench/logs/
