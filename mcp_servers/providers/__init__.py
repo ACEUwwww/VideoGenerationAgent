@@ -22,6 +22,7 @@ from mcp_servers.providers.base import (
 from mcp_servers.providers.ark_media import ArkImageProvider, ArkVideoProvider, ArkVisionJudge
 from mcp_servers.providers.doubao_speech import DoubaoSpeechProvider
 from mcp_servers.providers.kling_media import KlingVideoProvider
+from mcp_servers.providers.local_media import LocalVideoProvider
 from mcp_servers.providers.mock_media import (
     MockImageProvider,
     MockSpeechProvider,
@@ -55,6 +56,8 @@ def get_video_provider() -> VideoProvider:
         return ArkVideoProvider()
     if name == "kling":
         return KlingVideoProvider()
+    if name == "local":
+        return LocalVideoProvider(get_settings().media.video_model)
     raise ProviderConfigError(
         f"VIDEO_PROVIDER={name!r} has no implementation yet. "
         "Add a class in mcp_servers/providers/ and register it here."

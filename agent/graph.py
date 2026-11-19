@@ -21,6 +21,7 @@ from agent.nodes.video_nodes import (
     generate_video_prompt,
     has_more_keyframes,
     has_more_shots,
+    needs_image_phase,
     should_retry_video,
     start_video_phase,
     synthesize_dialogue,
@@ -53,7 +54,14 @@ def build_graph():
     graph.set_entry_point("analyze_user_goal")
     graph.add_edge("analyze_user_goal", "plan_story")
     graph.add_edge("plan_story", "plan_shots")
-    graph.add_edge("plan_shots", "generate_image_prompt")
+    # A text-to-video model takes no image, so the keyframe stage would render
+    # pictures nothing consumes and every anchor-derived metric would be scored
+    # against a placeholder. That stage is skipped, not degraded.
+    graph.add_conditional_edges(
+        "plan_shots",
+        needs_image_phase,
+        {"image": "generate_image_prompt", "text_to_video": "start_video_phase"},
+    )
     graph.add_edge("generate_image_prompt", "generate_image")
     graph.add_edge("generate_image", "evaluate_image")
     graph.add_conditional_edges(

@@ -163,8 +163,23 @@ class ArkVideoProvider:
 
     name = "ark"
 
+    @property
+    def frame_roles(self) -> frozenset[str]:
+        """Roles the configured model accepts, declared rather than guessed.
+
+        pro-fast is first-frame only; 1.0 pro and 2.x take an authored last
+        frame. The orchestration no longer reads the model id to decide this.
+        """
+        if supports_last_frame(get_settings().media.ark_video_model):
+            return frozenset({"first_frame", "last_frame"})
+        return frozenset({"first_frame"})
+
     def generate(self, request: VideoRequest) -> dict:
         base_url, api_key, model = _credentials("video")
+        if request.image_path is None:
+            # Seedance has no text-only task type; a caller reaching here with
+            # no first frame is a wiring error, not a mode to support.
+            raise ValueError("Ark video needs a first frame; it has no text-to-video mode")
         image_uri = _data_uri(request.image_path)
         content = [
             {"type": "text", "text": request.motion_prompt},

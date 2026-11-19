@@ -11,6 +11,7 @@ import json
 
 from agent.llm_client import get_llm
 from agent.prompts import BIBLE_SYSTEM, SHOTS_SYSTEM
+from agent.settings import get_settings
 from agent.state import AgentState, add_event, persist, track_usage
 from backend.services import project_store
 
@@ -19,8 +20,35 @@ from backend.services import project_store
 # for 3s on 2.0 is a hard API error, not a clamp. The old 6s cap made a long
 # shot impossible no matter what the prompt asked for: 8 shots over a 32s
 # target can only average 4s, so the shot list came back uniformly 4.0s.
+#
+# A local model renders one fixed length (about 5 s) and cannot be asked for
+# anything else, so on that layer the window collapses to a single value. The
+# difference is a configuration difference and is recorded as such: asking the
+# storyboard for an 8 s long take is meaningless when the renderer ignores it,
+# and joining two 5 s clips to fake one would inject a seam exactly where the
+# within-shot stability metric is being measured.
 MAX_SHOT_SECONDS = 12.0
 MIN_SHOT_SECONDS = 4.0
+
+
+def shot_window() -> tuple[float, float]:
+    """(min, max) shot length the configured video model can actually render."""
+    media = get_settings().media
+    if media.video_provider == "local":
+        from mcp_servers.providers.local_media import MODELS, _frames_for
+
+        spec = MODELS.get(media.video_model) or {}
+        fps = spec.get("fps")
+        if fps:
+            # Ask the model's own frame rule what a five-second request actually
+            # becomes. The two families disagree: 5 s is 41 frames at 8 fps
+            # (5.125 s) and 81 frames at 16 fps (5.0625 s). Hardcoding a frame
+            # count here made CogVideoX shots 10.125 s long — a real run
+            # produced 2 shots of 10.125 s apiece.
+            frames = _frames_for(spec.get("frame_rule", "4k+1"), fps, 5.0)
+            seconds = frames / fps
+            return seconds, seconds
+    return MIN_SHOT_SECONDS, MAX_SHOT_SECONDS
 
 
 def analyze_user_goal(state: AgentState) -> AgentState:
@@ -205,13 +233,17 @@ def rhythm_problems(durations: list[float], target_seconds: int) -> list[str]:
     stated requirement that nothing verifies is just a suggestion.
     """
     problems: list[str] = []
-    if durations and max(durations) < LONG_SHOT_SECONDS:
+    low, high = shot_window()
+    fixed_length = low == high
+    # A renderer that emits one fixed length cannot be given a long take, so
+    # demanding one only makes the model lie about durations it cannot deliver.
+    if not fixed_length and durations and max(durations) < LONG_SHOT_SECONDS:
         problems.append(
             f"没有 8 秒以上的长镜头（最长 {max(durations):.0f}s），"
             f"请把承载情绪转折的那一镜拉长到 8-12 秒"
         )
     streak = 1
-    for index in range(1, len(durations)):
+    for index in range(1, len(durations)) if not fixed_length else ():
         streak = streak + 1 if durations[index] == durations[index - 1] else 1
         if streak >= 3:
             problems.append(
@@ -314,7 +346,7 @@ def plan_shots(state: AgentState) -> AgentState:
             "emotion": raw.get("emotion", ""),
             "sfx": raw.get("sfx", ""),
             "transition": raw.get("transition", "硬切"),
-            "duration_s": min(max(duration, MIN_SHOT_SECONDS), MAX_SHOT_SECONDS),
+            "duration_s": min(max(duration, shot_window()[0]), shot_window()[1]),
             "characters": raw.get("characters", []),
             "status": "planned",
             "image_prompt": "",
@@ -344,7 +376,8 @@ def plan_shots(state: AgentState) -> AgentState:
 
 
 def _durations(raw_shots: list[dict]) -> list[float]:
-    return [min(max(float(shot.get("duration_s", 4) or 4), MIN_SHOT_SECONDS), MAX_SHOT_SECONDS) for shot in raw_shots]
+    low, high = shot_window()
+    return [min(max(float(shot.get("duration_s", 4) or 4), low), high) for shot in raw_shots]
 
 
 def _bible_request(state: AgentState) -> str:

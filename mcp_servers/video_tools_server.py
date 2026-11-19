@@ -89,7 +89,9 @@ def generate_video(
     if last_frame is not None and not last_frame.exists():
         last_frame = None
     request = VideoRequest(
-        image_path=root / image_path,
+        # Empty for a text-to-video run: the model takes no conditioning frame,
+        # and inventing a path here would fail on a file that was never written.
+        image_path=(root / image_path) if image_path else None,
         motion_prompt=motion_prompt,
         shot_id=shot_id,
         project_dir=root,
@@ -405,12 +407,25 @@ def _resolve_bgm(root: Path, configured: str | None) -> Path | None:
 
 
 def make_cover(project_id: str, *, title: str, subtitle: str = "") -> dict:
-    """Episode cover: first shot's keyframe with the title burned in."""
+    """Episode cover: a frame from the first shot, with the title burned in.
+
+    Prefers the keyframe, because it is the picture the episode was authored
+    from. A text-to-video run has no keyframes at all, so it falls back to
+    extracting a frame from the first rendered clip — the cover then shows what
+    the model actually produced rather than an image nothing downstream used.
+    """
     media = get_settings().media
     root = ensure_project_dirs(project_id)
     source = root / "images" / "shot_001.png"
     if not source.exists():
-        raise FileNotFoundError("cover needs images/shot_001.png")
+        from mcp_servers import keyframe_memory
+
+        clips = sorted((root / "videos").glob("shot_*.mp4"))
+        if not clips:
+            raise FileNotFoundError("cover needs a keyframe or at least one rendered clip")
+        source = root / "final" / "_cover_source.png"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        keyframe_memory.extract_keyframe(clips[0], source)
     target = root / "final" / "cover.png"
     safe_title = _escape_drawtext(title)[:24]
     safe_sub = _escape_drawtext(subtitle)[:30]

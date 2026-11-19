@@ -29,7 +29,10 @@ class ImageRequest:
 
 @dataclass
 class VideoRequest:
-    image_path: Path
+    # None for a text-to-video model: there is no conditioning frame, and
+    # passing one anyway would only be dropped downstream while the event log
+    # claimed an image-to-video step that never happened.
+    image_path: Path | None
     motion_prompt: str
     shot_id: str
     project_dir: Path
@@ -73,6 +76,16 @@ class ImageProvider(Protocol):
 
 class VideoProvider(Protocol):
     name: str
+
+    # Which image roles this model actually consumes: a subset of
+    # {"first_frame", "last_frame"}. Empty means text-to-video.
+    #
+    # The orchestration reads this instead of matching on the model id. Matching
+    # on a name is a guess that only stays true until a vendor adds a model: the
+    # string test it replaces lived in ark_media.py and had to be edited to
+    # learn about every new Seedance revision, while a provider that knows
+    # nothing about its own capabilities cannot be right by accident.
+    frame_roles: frozenset[str]
 
     def generate(self, request: VideoRequest) -> dict: ...
 

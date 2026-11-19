@@ -87,10 +87,15 @@ class KlingVideoProvider:
     """Image-to-video through the Kling task API."""
 
     name = "kling"
+    # Kling's video API conditions on a first frame only; there is no last-frame
+    # role, so a caller asking for one would be told to join tail-to-head.
+    frame_roles = frozenset({"first_frame"})
 
     def generate(self, request: VideoRequest) -> dict:
         base_url, api_key, model = _credentials()
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        if request.image_path is None:
+            raise ValueError("Kling video needs a first frame; it has no text-to-video mode")
 
         payload: dict = {
             "model_name": model,

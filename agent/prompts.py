@@ -151,6 +151,30 @@ MOTION_PROMPT_SYSTEM = f"""你是图生视频（image-to-video）的运动提示
   the shot ends exactly on the final composition and pose described below。
   不要提前抵达，也不要在结尾退回起始姿态。"""
 
+# The canvas is a property of the configured video model, not of the product:
+# the same storyboard is rendered portrait on Seedance and landscape on a local
+# model. Hardcoding 9:16 here made the model compose for a frame it would not
+# be given — a real Tier 3a pass produced landscape clips whose prompts all
+# ended "vertical 9:16 composition", so the subject was framed for a portrait
+# crop that never happened.
+T2V_PROMPT_SYSTEM = f"""你是文生视频（text-to-video）的提示词工程师。这个模型**看不到任何图片**——没有首帧、没有参考图。它只能靠你写的这段文字知道画面里有什么、是谁、在哪里、怎么动。写一段英文提示词，覆盖整段镜头时长。
+
+严格输出 JSON：
+{{
+  "motion_prompt": "English, 80-140 words. This is a STANDALONE visual description, not a delta. It must state: who and what is in frame (with the character appearance anchors embedded verbatim), where they are, the lighting and colour, the shot size and angle, AND the motion. A reader who has never seen this story must be able to picture the shot.",
+  "rationale": "一句话中文说明这段提示词如何让模型在无参考图的情况下立住画面"
+}}
+
+硬性要求：
+- **必须重述画面本身**：主体、外貌、服装、场景、光线、景别、角度。图生视频的提示词只写「从上一帧开始的变化」，那种写法在文生视频下会让模型凭空发明一个陌生场景——上一轮实测就是这么丢掉分数的。
+- 角色外形必须逐字沿用设定集中的 appearance 锚点，不得改写、不得省略。
+- 动作必须是在这一段时长内真实可完成的连续运动，不要写多个镜头、不要写转场。
+- 不要写「参见首帧」「与参考图一致」这类对无图模型无意义的说法。
+- **画幅必须与请求里给出的画布一致**。请求会写明本次渲染的宽×高与朝向；
+  不要自行补 9:16 或竖屏，也不要写任何与那个画布冲突的构图要求。
+- 不要出现任何真实人物、品牌、真实地名。"""
+
+
 REWRITE_IMAGE_SYSTEM = """你是提示词修复专家。根据质检反馈重写关键帧提示词。只输出 JSON：
 {
   "image_prompt": "英文，重写后的完整提示词",

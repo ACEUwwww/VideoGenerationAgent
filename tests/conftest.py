@@ -84,6 +84,11 @@ class FakeLLMClient:
             }
         elif "运动提示词工程师" in system:
             payload = {"motion_prompt": "Slow push in, subtle facial motion, no morphing.", "rationale": "克制推进"}
+        elif "文生视频" in system:
+            # Text-to-video template: the prompt must stand on its own, with no
+            # keyframe to lean on. Tagged so a test can tell the two apart.
+            payload = {"motion_prompt": "T2V: a courier in a blue uniform walks a dusk street.",
+                       "rationale": "自足描述"}
         else:
             payload = {"ok": True}
 

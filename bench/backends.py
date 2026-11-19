@@ -400,6 +400,124 @@ class LongLiveBackend:
 # Seedance model, asked with the same bare prompt our pipeline starts from,
 # but without a keyframe or a reference image in front of it. Any gap between
 # this and `ours` is the work the orchestration does, not a different model.
+class OpenMontageLocalBackend:
+    """OpenMontage's own local-model path, pinned to our weights and shape.
+
+    The vendored tool ships a variant table pointing at HuggingFace ids and its
+    own default resolution (720x480 landscape, 49 frames). Left alone it would
+    download from the network mid-run and render a different shape from the
+    side it is being compared against. ``generate_local_video`` takes the
+    variant table as an argument, so the override lives here and the vendored
+    source stays untouched.
+
+    What this backend reaches is still the *shot* stage only — prompt in, clip
+    out, no storyboard or keyframe layer in front of it. That is the same scope
+    as ``openmontage_shot``; only the generator behind it differs.
+    """
+
+    name = "openmontage_local"
+    modality = "t2v (OpenMontage local shot stage, open-weight model)"
+
+    def __init__(self, repo: Path, *, model: str = "cogvideox5b") -> None:
+        self.repo = repo
+        self.model = model
+
+    def available(self) -> tuple[bool, str]:
+        shared = self.repo / "tools" / "video" / "_shared.py"
+        if not shared.exists():
+            return False, f"OpenMontage is not vendored at {self.repo}"
+        import importlib.util
+
+        if importlib.util.find_spec("torch") is None or importlib.util.find_spec("diffusers") is None:
+            return False, "torch/diffusers unavailable in bench venv"
+        return True, f"{self.repo} (local shot stage, {self.model})"
+
+    def _variant(self) -> dict:
+        """The vendored variant entry with our checkpoint and shape imposed.
+
+        The base entry must come from the model family's own table: each one
+        carries a ``pipeline_class`` the loader dispatches on, and starting from
+        an empty dict produced five failures reading only ``'pipeline_class'``.
+        """
+        import sys
+
+        sys.path.insert(0, str(self.repo))
+        try:
+            from tools.video._shared import COGVIDEO_VARIANTS, WAN_VARIANTS
+        finally:
+            sys.path.pop(0)
+
+        from mcp_servers.providers.local_media import LOCAL_HEIGHT, LOCAL_WIDTH, MODELS
+
+        spec = MODELS[self.model]
+        if "wan" in self.model:
+            base = dict(WAN_VARIANTS["wan2.1-1.3b"])
+        else:
+            base = dict(COGVIDEO_VARIANTS["cogvideo-5b"])
+        base.update(
+            # Absolute path: the tool resolves a bare id against the network.
+            hf_id=str((Path(__file__).resolve().parent / "models" / "hf" / spec["path"]).resolve()),
+            default_width=LOCAL_WIDTH,
+            default_height=LOCAL_HEIGHT,
+            default_num_frames=81 if spec["fps"] == 16 else 41,
+            fps=spec["fps"],
+        )
+        return base
+
+    def generate(self, prompt: str, seed: int, seconds: float, out_dir: Path) -> Generation:
+        import sys
+        import time
+
+        sys.path.insert(0, str(self.repo))
+        try:
+            from tools.video._shared import generate_local_video
+        finally:
+            sys.path.pop(0)
+
+        from mcp_servers.providers.local_media import LOCAL_HEIGHT, LOCAL_WIDTH
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        target = (out_dir / f"{self.name}_{seed}.mp4").resolve()
+
+        started = time.monotonic()
+        result = generate_local_video(
+            tool_name=self.name,
+            variants={"local": self._variant()},
+            default_variant="local",
+            inputs={
+                "prompt": prompt,
+                "operation": "text_to_video",
+                "model_variant": "local",
+                "seed": seed,
+                "width": LOCAL_WIDTH,
+                "height": LOCAL_HEIGHT,
+                "output_path": str(target),
+                # Offloading streams every weight back over PCIe on each of the
+                # denoise steps; the host has 275 GB of VRAM.
+                "enable_model_offload": False,
+            },
+        )
+        elapsed = time.monotonic() - started
+        if not result.success:
+            raise RuntimeError(f"OpenMontage local shot stage failed: {result.error}")
+        if not target.exists():
+            raise RuntimeError(f"OpenMontage produced no file at {target}")
+
+        return Generation(
+            model=self.name,
+            prompt=prompt,
+            seed=seed,
+            path=target,
+            seconds=float(result.data.get("duration_seconds") or seconds),
+            width=int(result.data.get("width") or LOCAL_WIDTH),
+            height=int(result.data.get("height") or LOCAL_HEIGHT),
+            fps=int(result.data.get("fps") or 16),
+            modality=self.modality,
+            elapsed_s=elapsed,
+            note=f"{result.data.get('model_id', '')} | shot stage only, no storyboard",
+        )
+
+
 class OpenMontageBackend:
     name = "openmontage_shot"
     modality = "t2v (OpenMontage shot stage, Seedance via Ark)"
@@ -510,6 +628,13 @@ REGISTRY: dict[str, DiffusersT2VBackend | LongLiveBackend | OpenMontageBackend] 
         steps=40,
         guidance=5.0,
     ),
+    # OpenMontage's own local-model tool, pinned to the same weights and the
+    # same shape as `local_*` above. Its built-in variant table points at
+    # HuggingFace ids and its own default resolution, so the variant is
+    # overridden here rather than edited in the vendored tree — the two sides
+    # must render from one checkpoint at one size or the comparison measures
+    # the configuration, not the workflow.
+    "openmontage_local": OpenMontageLocalBackend(OPENMONTAGE_ROOT),
     "openmontage_shot": OpenMontageBackend(OPENMONTAGE_ROOT),
     "longlive_1_3b": LongLiveBackend(
         repo=LONGLIVE_ROOT,

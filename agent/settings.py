@@ -113,7 +113,8 @@ def load_settings() -> Settings:
         image_model=_env("IMAGE_MODEL"),
         video_base_url=_env("VIDEO_BASE_URL"),
         video_api_key=_env("VIDEO_API_KEY"),
-        video_model=_env("VIDEO_MODEL"),
+        # Also names the open-weight model for VIDEO_PROVIDER=local.
+        video_model=_env("VIDEO_MODEL", "cogvideox5b"),
         tts_base_url=_env("TTS_BASE_URL"),
         tts_api_key=_env("TTS_API_KEY"),
         tts_model=_env("TTS_MODEL", "seed-audio-1.0"),

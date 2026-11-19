@@ -114,6 +114,11 @@ class MockImageProvider:
 
 class MockVideoProvider:
     name = "mock"
+    # The mock can stand in for either mode: it renders from the keyframe when
+    # one is given and from a generated colour field when it is not. Claims
+    # both roles so the agent's existing i2v path is exercised by the tests
+    # rather than silently skipped.
+    frame_roles = frozenset({"first_frame", "last_frame"})
 
     def generate(self, request: VideoRequest) -> dict:
         target = request.project_dir / "videos" / f"{request.shot_id}.mp4"
@@ -128,21 +133,28 @@ class MockVideoProvider:
         else:
             zoom = "max(1.16-0.0016*on,1.0)"
         motion = "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-        pan_y = "y='ih/2-(ih/zoom/2)-8*sin(on/24)'" if direction == "in" else "y='ih/2-(ih/zoom/2)'"
+        pan_y = "y='ih/2-(ih/zoom/2)-8*sin(on/24)" if direction == "in" else "y='ih/2-(ih/zoom/2)'"
 
         vf = (
             f"scale={request.width * 2}:{request.height * 2},"
             f"zoompan=z='{zoom}':{motion.replace(pan_y, pan_y)}:d={frames}:s={request.width}x{request.height}:fps={request.fps},"
             f"format=yuv420p"
         )
+        if request.image_path:
+            # ``-loop`` belongs to the image2 demuxer, so it has to sit next to
+            # its own input; placing it before a lavfi source makes ffmpeg read
+            # the colour spec as a filename.
+            source = ["-loop", "1", "-i", str(request.image_path)]
+        else:
+            # Text-to-video: there is no keyframe to loop. A flat colour field
+            # still exercises the whole encode path, and the zoompan below gives
+            # it the same motion a real clip would carry.
+            source = ["-f", "lavfi", "-i", f"color=c=0x203040:s={request.width}x{request.height}"]
         run(
             [
                 ffmpeg_bin(),
                 "-y",
-                "-loop",
-                "1",
-                "-i",
-                str(request.image_path),
+                *source,
                 "-t",
                 f"{request.duration_s:.3f}",
                 "-vf",

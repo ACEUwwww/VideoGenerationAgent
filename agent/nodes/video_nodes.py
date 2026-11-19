@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from agent.llm_client import get_llm
-from agent.prompts import MOTION_PROMPT_SYSTEM
+from agent.prompts import MOTION_PROMPT_SYSTEM, T2V_PROMPT_SYSTEM
 from agent.state import (
     AgentState,
     add_event,
@@ -19,31 +19,57 @@ from agent.settings import get_settings
 from mcp_servers import keyframe_memory
 from mcp_servers import video_tools_server as tools
 from mcp_servers.evaluators import evaluate_video as qa_video
-from mcp_servers.providers import get_vision_judge
-from mcp_servers.providers.ark_media import ContentModerationError, supports_last_frame
+from mcp_servers.providers import get_video_provider, get_vision_judge
+from mcp_servers.providers.ark_media import ContentModerationError
 from mcp_servers.videobench_eval import evaluate_clip
 
 
 def generate_video_prompt(state: AgentState) -> AgentState:
     shot = current_shot(state)
-    add_event(state, "Thought", f"为 {shot['id']} 设计运动提示词。")
+    text_to_video = not get_video_provider().frame_roles
+    add_event(
+        state,
+        "Thought",
+        f"为 {shot['id']} 设计{'文生视频' if text_to_video else '运动'}提示词。",
+        {"mode": "text-to-video" if text_to_video else "image-to-video"},
+    )
     llm = get_llm()
     following = (state.get("shots") or [])[shot.get("index", 0) + 1 : shot.get("index", 0) + 2]
     ending = ""
-    if following:
+    if following and not text_to_video:
         nxt = following[0]
         ending = (
             f"\n结束帧（本镜必须在这里收尾）：{nxt.get('shot_size', '')} · {nxt.get('scene', '')} · "
             f"{nxt.get('description', '')}"
         )
-    request = (
-        f"分镜：{json.dumps(shot, ensure_ascii=False)}\n"
-        f"关键帧提示词：{shot.get('image_prompt', '')}\n"
-        f"时长：{shot['duration_s']} 秒"
-        f"{ending}\n"
-        f"整体调性：{state.get('tone', '')}"
-    )
-    data, reply = llm.generate_json(MOTION_PROMPT_SYSTEM, request, required_keys=("motion_prompt",))
+    # A text-to-video model never sees a keyframe, so the prompt has to carry the
+    # picture itself: who, where, what light, what framing. Handing it the
+    # image-to-video template produces a description of a *change* with no scene
+    # attached, and the model invents a stranger standing in an unknown place.
+    # Measured: that is exactly what the first Tier 3a pass scored badly on.
+    character_text = json.dumps(state.get("characters") or [], ensure_ascii=False)
+    if text_to_video:
+        media = get_settings().media
+        orientation = "横版 landscape" if media.width > media.height else "竖版 portrait"
+        request = (
+            f"分镜：{json.dumps(shot, ensure_ascii=False)}\n"
+            f"角色外形锚点（必须逐字写进提示词）：{character_text}\n"
+            f"本次渲染画布：{media.width}x{media.height}，{orientation}\n"
+            f"场景设定：{state.get('setting', '')}\n"
+            f"本集梗概：{state.get('logline', '')}\n"
+            f"时长：{shot['duration_s']} 秒\n"
+            f"整体调性：{state.get('tone', '')}"
+        )
+    else:
+        request = (
+            f"分镜：{json.dumps(shot, ensure_ascii=False)}\n"
+            f"关键帧提示词：{shot.get('image_prompt', '')}\n"
+            f"时长：{shot['duration_s']} 秒"
+            f"{ending}\n"
+            f"整体调性：{state.get('tone', '')}"
+        )
+    system = T2V_PROMPT_SYSTEM if text_to_video else MOTION_PROMPT_SYSTEM
+    data, reply = llm.generate_json(system, request, required_keys=("motion_prompt",))
     track_usage(state, f"{shot['id']}/motion_prompt", reply)
     add_event(state, "Decision", data.get("rationale", "使用生成的运镜描述。"), {"prompt": data["motion_prompt"]})
     return update_current_shot(
@@ -103,26 +129,33 @@ def _next_keyframe(state: AgentState, shot: dict) -> str:
 def call_generate_video(state: AgentState) -> AgentState:
     shot = current_shot(state)
     media = get_settings().media
+    provider = get_video_provider()
+    roles = provider.frame_roles
     authored_last = ""
-    first_frame = shot["image_path"]
-    join = "authored"
+    first_frame: str | None = None
+    join = "none"
 
-    if media.video_provider == "ark" and not supports_last_frame(media.ark_video_model):
-        # pro-fast rejects the last_frame role (task_type flf2v), so the clip is
-        # joined by starting from the previous clip's real tail frame instead.
-        join = "tail-to-head"
-        tail = _previous_tail_frame(state, shot)
-        if tail:
-            first_frame = tail
-    else:
+    if not roles:
+        # Text-to-video: the model consumes no image at all. Recording
+        # "authored" here would claim a conditioning step that never happened.
+        join = "none"
+    elif "last_frame" in roles:
+        # Both ends authored by the image stage, so drift cannot accumulate.
+        first_frame = shot["image_path"]
+        join = "authored"
         authored_last = _next_keyframe(state, shot)
+    else:
+        # First frame only: join on the previous clip's real tail, falling back
+        # to this shot's own keyframe for the opening shot.
+        join = "tail-to-head"
+        first_frame = _previous_tail_frame(state, shot) or shot["image_path"]
 
     add_event(
         state,
         "Action",
         "MCP.generate_video",
         {"shot_id": shot["id"], "provider": media.video_provider, "duration_s": shot["duration_s"],
-         "join": join, "first_frame": first_frame, "last_frame": authored_last or "none"},
+         "join": join, "first_frame": first_frame or "none", "last_frame": authored_last or "none"},
     )
     try:
         result = tools.generate_video(
@@ -376,6 +409,30 @@ def advance_keyframe(state: AgentState) -> AgentState:
 
 def has_more_keyframes(state: AgentState) -> str:
     return "more" if state.get("current_shot_index", 0) < len(state.get("shots", [])) else "all_done"
+
+
+def needs_image_phase(state: AgentState) -> str:
+    """Route past the whole image stage when the video model takes no image.
+
+    A text-to-video model has nothing to condition on, so rendering keyframes
+    would spend a stage's worth of calls producing pictures no shot consumes —
+    and every metric derived from them (anchor drift, keyframe quality) would
+    then be scored against a placeholder. Skipping the stage entirely keeps the
+    run honest: the shot list goes straight to the video prompt.
+
+    ``start_video_phase`` is still the entry point in both cases, because it is
+    what rewinds the shot cursor after planning.
+    """
+    if not get_video_provider().frame_roles:
+        add_event(
+            state,
+            "Decision",
+            "视频模型不接受任何图像输入（T2V），跳过整个关键帧阶段；"
+            "本层不产出锚点，所有依赖关键帧的指标标记为不适用。",
+            {"reason": "text-to-video", "provider": get_settings().media.video_provider},
+        )
+        return "text_to_video"
+    return "image"
 
 
 def advance_shot(state: AgentState) -> AgentState:
