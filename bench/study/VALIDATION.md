@@ -75,6 +75,190 @@
 | `batch-video` 逐镜吞异常仍回 HTTP 200 | 第 2 条（`benchs0-2`）15 镜里 **2 镜从未提交到 Ark**：shot 7 `pending` 且 `providerTaskId=null`，shot 14 `generating` 且 `providerTaskId=null`。响应体 `started[]` 里带了错误，但 HTTP 状态是 200，驱动按状态码判定就漏了 | 已定位；`om_full.py` 改为检查 `started[]` 的 `error` 字段。补交后 15/15 |
 | studio 成片质检会丢弃已付费的渲染 | 补交的 shot 14：Ark 任务 `cgt-20261117182015-759rk` 状态 **succeeded**、视频可下载，但 studio 的 `video_qa` 判定「质检未达标」标 `failed`，随后自动重试生成第二条并选中 | 已定位，属编排层行为；报告需记录「Ark 成功 ≠ 流程采纳」 |
 
+## Tier 3a/3b 阶段 0：三个未知量（2026-11-18，零费用）
+
+动代码前先测这三项，因为它们决定矩阵能不能做。
+
+### 1. 本地权重的实际可用性
+
+| 模型 | 本地路径 | 状态 |
+| --- | --- | --- |
+| CogVideoX-5B（T2V） | `bench/models/hf/zai-org/CogVideoX-5b` | 可用 |
+| Wan2.1-T2V-1.3B | `bench/models/hf/Wan-AI/Wan2.1-T2V-1.3B-Diffusers` | 可用 |
+| LongLive-1.3B | `bench/models/longlive`（Wan2.1 底座 + LoRA） | 可用 |
+| **CogVideoX-5B-I2V** | 本地**不存在** | **需下载 21.6 GB，未获准，Tier 3b 因此暂不可执行** |
+
+`zai-org/CogVideoX-5b-I2V` 在 HuggingFace 上存在且结构与 5B 一致（22 个文件，text_encoder 9.5 GB + transformer 11.3 GB + vae 0.86 GB）。`bench/fetch_models.sh` 是并行分段 curl，实测约 8 MB/s，下载预计 45–60 分钟。**本轮不下载**，等你点头。
+
+### 2. 三模型能否共用同一分辨率 —— 可以，但只有一个方向
+
+原生档位（读各自 `transformer/config.json` 与 `vae/config.json`）：
+
+| 模型 | 原生输出 | 约束来源 |
+| --- | --- | --- |
+| CogVideoX-5B | 480×720 竖（= latent 60×90 × patch 2…VAE 8×） | `sample_height=60, sample_width=90` |
+| Wan2.1-T2V-1.3B | 480×832 竖 | Wan 公开的竖版桶 |
+| LongLive-1.3B | **832×480 横** | `inference.py` 里 latent 噪声写死 `[N, 16, 60, 104]`，`config.height/width` **从不被读取**（grep 计数 0） |
+
+LongLive 的 `[16, 60, 104]` 是 480×832 的**横版**（60×8=480 高，104×8=832 宽）。它不是"支持 832×480 与 480×832"，是只有这一个形状；要改就得动 `bench/_vendor/`，而本轮禁止。
+
+**实测探针**（`bench/.venv`，20 步，非生产的 40 步，单条 5s 量级）：
+
+| 测试 | 结果 |
+| --- | --- |
+| CogVideoX @ 480×832 竖 | OK，22 s |
+| CogVideoX @ 832×480 横 | OK，22 s |
+| Wan2.1 @ 480×720 竖 | OK，12 s |
+| Wan2.1 @ 832×480 横 | OK，14 s |
+
+**结论**：三模型唯一能共用的档位是 **832×480 横版**——CogVideoX 与 Wan 都能出这个尺寸（已实测），LongLive 只能出这个尺寸（写死）。竖版 480×832 做不到，因为 LongLive 改不了。
+
+这产生一个必须记录的配置差异：**Tier 3a 是横版 832×480，而已付费的 Tier 1 是竖版 480p。** 两层的分辨率口径不同，结论不能横向相加，也不能把 Tier 3a 的分数当作 Tier 1 的补充样本。
+
+### 3. 判分吞吐（单锁串行，本地免费）
+
+| 粒度 | 实测 | 说明 |
+| --- | --- | --- |
+| 片段级四维判分 | **31.7–53.5 s/组**（n=60 每组） | `motion_effects` 38.0 / `temporal_consistency` 31.7 / `imaging` 44.7 / `aesthetic` 53.5 |
+| 成片级单维、单侧 | **139.9 s**（帧采样 9.1 s + 判分 130.8 s） | 刚实测：60 s 成片一条 |
+| 成片级单维、两侧 | 229–580 s | 从 `episode_video_text.json` 读出的历史值 |
+
+**本地渲染耗时**（从 180 条已有产物的文件时间戳推，不是生产口径，仅供排期）：
+
+| 模型 | 相邻产物间隔中位 | 单集 12 镜估算 |
+| --- | --- | --- |
+| CogVideoX-5B | ~37 s | ~7.5 min |
+| Wan2.1-T2V-1.3B | ~27 s | ~5.4 min |
+| LongLive-1.3B | ~116 s | ~23 min |
+
+据此，Tier 3a 每格 n=5 的估算：渲染 (7.5+5.4+23)×2×5 ≈ **6 h**；成片级判分 5 维 × 3 模型 × 5 对 × 约 350 s ≈ **7 h**。合计 **13–15 h 串行**，n=5 是可行上限，n=8 约 22–24 h。
+
+**这三项已测完。分辨率一项需要你在开工前确认：接受 832×480 横版作为 Tier 3a 的统一口径，还是就此停住。**
+
+## Tier 3a/3b 实现记录（2026-11-18）
+
+### 本地 provider
+
+`mcp_servers/providers/local_media.py`，`VIDEO_PROVIDER=local` + `VIDEO_MODEL=<名>` 选定。
+权重从 `bench/models/hf/` 读，加载时不联网。
+
+| `VIDEO_MODEL` | 状态 | 帧角色声明 | 实测单条 |
+| --- | --- | --- | --- |
+| `cogvideox5b` | passed | 空（T2V） | 832×480、41 帧、5.125 s、66.0 s |
+| `wan21_1_3b` | passed | 空（T2V） | 832×480、81 帧、5.0625 s、54.7 s |
+| `longlive_1_3b` | pending | 空（T2V） | 未在本轮实测（子进程路径已接） |
+| `cogvideox5b_i2v` | **pending（权重未到位）** | `{first_frame}` | 未实测 |
+
+单条渲染耗时是本层的真实成本，已记入元数据 `elapsed_s`。`usage` 为空字典、`billed: false`——不是"零 token"，是本层不计费。
+
+### 编排层：能力查询取代模型名匹配
+
+`VideoProvider` 契约新增 `frame_roles: frozenset[str]`。编排层读声明，不再匹配模型 id：
+
+| provider | 声明 |
+| --- | --- |
+| ark（1.0 pro / 2.x） | `{first_frame, last_frame}` |
+| ark（pro-fast） | `{first_frame}` |
+| kling | `{first_frame}` |
+| local（三个 T2V） | `∅` |
+| local（I2V） | `{first_frame}` |
+| mock | `{first_frame, last_frame}` |
+
+`call_generate_video` 按声明分三支：空 → `join="none"` 且首帧为 None；有 `last_frame` → 编排关键帧；仅 `first_frame` → 尾帧接头。
+
+### T2V 跳过整个图像阶段
+
+`plan_shots` 后由 `needs_image_phase` 分流。T2V 下直接进 `start_video_phase`，不产出任何关键帧、不写 `image_prompt`。因此**所有依赖关键帧的指标在 Tier 3a 标为不适用**，不进聚合。
+
+顺带修掉两个只有走到这条路径才暴露的缺口：
+
+| 问题 | 证据 | 状态 |
+| --- | --- | --- |
+| `make_cover` 硬依赖 `images/shot_001.png` | T2V 下开跑第 76 秒抛 `FileNotFoundError` | passed——改为回落到首镜成片抽帧 |
+| `tools.generate_video` 把空 `image_path` 当 Path 拼接 | `TypeError: PosixPath / NoneType` | passed——空串转 `None` |
+
+单镜时长：本地模型固定约 5 s，`shot_window()` 在该层把窗口收成单值，分镜的「至少一个 8 秒长镜」「不得三连同长」两条硬约束在固定时长下自动停用，因为渲染器无法兑现。这是**配置差异**，不是放宽标准。
+
+### OpenMontage 侧同模型接线
+
+`bench/backends.py` 新增 `OpenMontageLocalBackend`（`openmontage_local`），调用 vendored 的
+`generate_local_video`，但把变体表覆盖为我们自己的权重的绝对路径与 832×480。
+
+**不硬编码**：形状与权重复用 `local_media.LOCAL_WIDTH/HEIGHT` 与 `MODELS[...]["path"]`，两侧由一个常量派生，不可能各自漂走。
+
+实测：832×480、8 fps、5.125 s、57 s。与我们的 CogVideoX 侧同尺寸同帧率同帧数。
+
+**范围**：这条路径仍只到 shot 阶段（prompt in、clip out），不含 storyboard/关键帧层——与 `openmontage_shot` 同一范围，只有底模不同。
+
+### 测试
+
+| 项 | 结果 |
+| --- | --- |
+| 全量 `pytest tests -q` | **128 passed / 7 skipped**（372 s） |
+| 三 T2V 模型声明空帧角色 | parametrize 三例，passed |
+| I2V 声明首帧角色 | passed |
+| 各 provider 都有 `frame_roles` | passed |
+| 各模型帧数契约（4k+1 / fps） | parametrize 两例，passed |
+| T2V 跳过图像阶段 | passed——断言无 `image_path`、`image_prompt`，且 join 均为 `none` |
+| 单镜 / 双镜 / 五镜边界 | parametrize 三例，passed |
+
+### 已知失败与阻塞
+
+| 项 | 状态 |
+| --- | --- |
+| I2V 权重下载 | **failed 两次**。`fetch_models.sh` 的并行分段 curl 在 4.7 GB 的 T5 分片上 `CHUNK FAILED`，两次都被删除。改用顺序 `curl -C -` 续传后速度约 500 KB/s，已下 449 MB / 21.6 GB，预计十余小时。**Tier 3b 因此 pending，不是 failed。** |
+| `longlive_1_3b` 走本地 provider | pending——子进程路径已写，未实测 |
+
+## Tier 3a 正式报告（2026-11-19）
+
+报告：`bench/results/tier3a_report.md`，图表 `docs/figures/tier3a_{consistency,clip,workflow}.png`。
+
+### 两个结论，缺一不可
+
+| 结论 | 数值 | 样本 | 显著性 | 状态 |
+| --- | --- | --- | --- | --- |
+| 跨镜角色一致性 | 2.00 → 4.17（+2.17，5 分制） | 6 组 × 5 镜（2 模型 × 3 brief） | 符号检验单侧 p=0.031 | passed |
+| 单镜画质四维均值 | 4.175（brief）/ 3.675（完整规划）/ 3.750（截短消融） | 8 格（2 模型 × 4 维） | 单格 p≥0.33，brief 胜 6/8 | passed（**反面结果**） |
+
+截短消融只补回 0.075，因此单镜落后**不是提示词长度造成的**，该解释已排除。
+
+### 数字核对
+
+报告内 11 项数值已用脚本对 `character_consistency.json`、`tier3a_ab/judge/*.json`、两份 `clips.jsonl` 逐一复核，全部一致。图表由 `tier3a_figures.py` 从这些文件读出，不硬编码。
+
+### 新增/修改的代码
+
+| 文件 | 作用 |
+| --- | --- |
+| `mcp_servers/providers/local_media.py` | 本地视频 provider（3 个 T2V + 1 个 I2V），声明 `frame_roles` |
+| `mcp_servers/providers/base.py` | `VideoProvider.frame_roles`；`VideoRequest.image_path` 可为 None |
+| `agent/nodes/video_nodes.py` | 按能力分派三条路径；T2V 走 `T2V_PROMPT_SYSTEM` |
+| `agent/nodes/planner.py` | `shot_window()`：本地模型固定时长 |
+| `agent/graph.py` | `needs_image_phase`：T2V 跳过整个图像阶段 |
+| `mcp_servers/video_tools_server.py` | `make_cover` 无关键帧时回落到首镜抽帧 |
+| `bench/backends.py` | `OpenMontageLocalBackend` |
+| `bench/study/tier3a{,_ab,_story,_figures}.py` | 渲染、A/B、主实验、图表 |
+
+回归：`pytest tests -q` → **128 passed / 7 skipped**。
+
+### 未完成路径（如实记录）
+
+| 路径 | 阻塞 | 状态 |
+| --- | --- | --- |
+| CogVideoX-5B-I2V | diffusers 对该 checkpoint 强制原生分辨率，`ValueError: ... different resolution that the defaults`；与 832×480 共用档位冲突 | unavailable（权重已备，代码已接） |
+| OpenMontage 完整工作流（本地） | 需 Postgres/Redis/MinIO，且派发层不认本地 video tool；接入须改 vendor（本轮禁止） | unavailable |
+| LongLive 的 OpenMontage 侧 | OpenMontage 无 LongLive 变体 | unavailable |
+| 真实 TTS | 本轮 `TTS_PROVIDER=mock`，音频为静音占位轨 | untested |
+| 9:16 竖版本地渲染 | 本层统一 832×480 横版 | untested |
+
+### 数据来源对应
+
+| 报告章节 | 原始产物 |
+| --- | --- |
+| §2 主结果 | `bench/results/tier3a_story/{clips.jsonl,character_consistency.json}` |
+| §3 反面结果 | `bench/results/tier3a_ab/{clips.jsonl,judge/*.json}` |
+| §4 交付事实 | `bench/results/tier3a_story/clips.jsonl` 的 prompt 长度与耗时字段 |
+
 ## 本轮（100 元充值后）的最终状态
 
 | 项 | 状态 |
