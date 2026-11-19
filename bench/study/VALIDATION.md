@@ -32,7 +32,7 @@
 | 本地基线可分段 | `segment_study.py --segment-seconds 1.0` → 180 条 × 5 窗 = 900 窗；每模型 identity 中位 CogVideoX 0.921 / Wan2.1 0.981 / LongLive 0.958 | passed |
 | 四维裁判全部完成 | 240/240 组，每维 60 组 × 3 模型：成像 1.07/4.02/4.72、美学 1.32/3.90/4.25、时序 2.38/4.58/4.82、运动 1.50/2.87/3.37（CogVideoX / Wan2.1 / LongLive） | passed |
 | 维度排序在模型间可分 | 四维一致排序 LongLive > Wan2.1 > CogVideoX；模型内极差（≤4 分）与模型间差（≥2.5 分）相比，排序可信。运动效果是最弱一维，三模型均未过 4 | passed |
-| 三张图可直接生成 | `figures_study.py` → `docs/figures/study_{quality,identity,workflow}.png`，数值与 `judge/`、`segments/`、`compare_workflows/episodes.json` 逐一核对 | passed |
+| 三张图可直接生成 | `figures_study.py` → `docs/figures/study_{quality,identity,workflow}.png`，数值与 `judge/`、`segments/`、`compare_workflows/episodes.json` 逐一核对 | **已删除**（2026-11-19）：这些图把 workflow 与裸模型并列，口径不成立，见下节 |
 | 身份指标已拆成「色彩 / 构图」两个可解释分量 | 逐镜 1s 切窗对比首窗：一条从背影全景推到正面特写的镜头，人物与服装未变，色彩 0.885 / 构图 0.694；另一条色彩 0.901 / 构图 −0.071。**结论：指纹的 `min(color, structure)` 测的是构图与机位，不是角色身份**，报告已按此改写措辞 | passed |
 | 跨镜角色一致性有独立指标 | `character_consistency.py`：把同集各镜画面交给本地 Qwen2.5-VL 判定是否为同一人（脸/发型/体型/服装），明确排除机位、背景、打光。同一集重复问两遍，评分完全一致（3/3、4/4、5/5、4/4），说明问题稳定而非噪声 | passed |
 
@@ -208,6 +208,35 @@ LongLive 的 `[16, 60, 104]` 是 480×832 的**横版**（60×8=480 高，104×8
 | --- | --- |
 | I2V 权重下载 | **failed 两次**。`fetch_models.sh` 的并行分段 curl 在 4.7 GB 的 T5 分片上 `CHUNK FAILED`，两次都被删除。改用顺序 `curl -C -` 续传后速度约 500 KB/s，已下 449 MB / 21.6 GB，预计十余小时。**Tier 3b 因此 pending，不是 failed。** |
 | `longlive_1_3b` 走本地 provider | pending——子进程路径已写，未实测 |
+
+## 口径修正：删除把 workflow 与 model 并列的旧图（2026-11-19）
+
+用户指出：本项目交付的是**工作流**，而 CogVideoX / Wan / LongLive 是**生成模型**，一次调用出一条片段。把两者放进同一张分数图并列，比的是两个不同层面的东西，差异无法归因到任何一方。
+
+受影响的产物已删除：
+
+| 删除项 | 问题 |
+| --- | --- |
+| `docs/figures/quality.png` | 同一张柱状图并列 `ours`、`openmontage_shot` 与三个裸模型 |
+| `docs/figures/identity.png` | 同上 |
+| `docs/figures/longform.png` | 把本项目 8 镜成片与 LongLive 30 秒单镜并列 |
+| `docs/figures/capability.png` | 把工作流的交付能力当成模型的交付能力同表比较 |
+| `docs/figures/study_{quality,identity,workflow}.png` | 同上，且与 `figures_study.py` 绑定 |
+| `bench/results/compare/report.md` | 上述图的配套报告 |
+| `bench/results/study/report_study.md` | 同上 |
+| `bench/results/compare_workflows/report_workflows.md` | 同上 |
+
+**保留下来的对比**（`tier3a_*`）不受影响，因为它们全部是同类对象之间的比较：
+
+| 图 | 比较的是 | 是否同类 |
+| --- | --- | --- |
+| `tier3a_consistency.png` | 有状态传递 ↔ 无状态传递（同底模、同种子） | 是 |
+| `tier3a_clip.png` | 三种提示词来源（同底模、同种子） | 是 |
+| `tier3a_workflow.png` | 两组各自交付的事实 | 是 |
+
+模型在本项目中只作为**实验介质**：固定它们，才能单独测出编排层的贡献。它们不是竞争对手。README §11.6 已写入这条口径。
+
+三张新图的全部文字已改为英文。
 
 ## Tier 3a 正式报告（2026-11-19）
 

@@ -51,14 +51,14 @@ SURFACE = "#ffffff"
 # separate figures rather than on one axis, because summing or sharing an axis
 # across them would imply a common unit that does not exist.
 DIMS = ["imaging_quality", "aesthetic_quality", "temporal_consistency", "motion_effects"]
-DIM_ZH = {
-    "imaging_quality": "成像质量",
-    "aesthetic_quality": "美学质量",
-    "temporal_consistency": "时序一致性",
-    "motion_effects": "运动效果",
+DIM_LABEL = {
+    "imaging_quality": "Imaging quality",
+    "aesthetic_quality": "Aesthetic quality",
+    "temporal_consistency": "Temporal consistency",
+    "motion_effects": "Motion effects",
 }
 MODELS = ["cogvideox5b", "wan21_1_3b"]
-MODEL_ZH = {"cogvideox5b": "CogVideoX-5B", "wan21_1_3b": "Wan2.1-1.3B"}
+MODEL_LABEL = {"cogvideox5b": "CogVideoX-5B", "wan21_1_3b": "Wan2.1-1.3B"}
 
 # Character scores are read from the persisted file, not retyped here: a figure
 # that hardcodes its own numbers cannot be checked against the judge output, and
@@ -90,7 +90,7 @@ def figure_consistency() -> Path:
     """The main result: carried state vs no carried state, per story."""
     scores = story_scores()
     stories = sorted(scores)
-    labels = [f"{MODEL_ZH[m]}\nbrief {b}" for m, b in stories]
+    labels = [f"{MODEL_LABEL[m]}\nbrief {b}" for m, b in stories]
     ind = [scores[s][0] for s in stories]
     pla = [scores[s][1] for s in stories]
 
@@ -100,10 +100,10 @@ def figure_consistency() -> Path:
 
     x = range(len(stories))
     width = 0.36
-    b1 = ax.bar([i - width / 2 for i in x], ind, width, label="逐镜独立生成（不传递状态）",
-                color=CONTROL, zorder=3)
-    b2 = ax.bar([i + width / 2 for i in x], pla, width, label="编排层主导（跨镜传递角色锚点）",
-                color=OURS, zorder=3)
+    b1 = ax.bar([i - width / 2 for i in x], ind, width,
+                label="Independent shots (no state carried)", color=CONTROL, zorder=3)
+    b2 = ax.bar([i + width / 2 for i in x], pla, width,
+                label="Orchestrated (appearance anchor carried)", color=OURS, zorder=3)
 
     for bars in (b1, b2):
         for rect in bars:
@@ -115,20 +115,21 @@ def figure_consistency() -> Path:
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels, fontsize=9, color=INK)
     ax.set_ylim(0, 5.9)
-    ax.set_ylabel("跨镜角色一致性（VLM 判定，1–5）", fontsize=10, color=INK)
+    ax.set_ylabel("Cross-shot character consistency (VLM, 1-5)", fontsize=10, color=INK)
     ax.set_yticks(range(0, 6))
     ax.legend(frameon=False, fontsize=9.5, loc="upper left", ncol=2)
 
     mi = statistics.mean(ind)
     mp = statistics.mean(pla)
     ax.set_title(
-        f"同一 brief、同一模型、逐镜种子固定：唯一的变量是「镜与镜之间是否传递角色状态」\n"
-        f"均值 {mi:.2f} → {mp:.2f}（n=6 组），5 胜 1 平 0 负，符号检验 p=0.031",
+        "Same brief, same model, same per-shot seed -\n"
+        "the only variable is whether character state is carried between shots\n"
+        f"mean {mi:.2f} -> {mp:.2f} (n=6), 5 wins / 1 tie / 0 losses, sign test p=0.031",
         fontsize=11.5, color=INK, loc="left", pad=14)
 
     fig.text(0.012, 0.015,
-             "数据：bench/results/tier3a_story/clips.jsonl（12 组 × 5 镜）；判分 qwen2.5-vl-32b-local，"
-             "问的是「脸/发型/体型/服装是否为同一个人」，明确排除机位与打光。",
+             "Data: bench/results/tier3a_story/clips.jsonl (12 arms x 5 shots). Judge: qwen2.5-vl-32b-local, "
+             "asked whether face / hair / build / clothing are the same person, camera and lighting excluded.",
              fontsize=7.6, color=MUTED)
     fig.tight_layout(rect=(0, 0.045, 1, 1))
     out = FIG / "tier3a_consistency.png"
@@ -146,9 +147,9 @@ def figure_clip() -> Path:
             for model in MODELS:
                 data[(dim, arm, model)] = statistics.mean(payload["samples"][f"{arm}__{model}"])
 
-    arms = [("brief", "原始 brief（36 字符）", CONTROL),
-            ("planned", "完整规划提示词（约 900 字符）", OURS),
-            ("planned_short", "截短到前两句（约 400 字符）", MUTED)]
+    arms = [("brief", "Bare brief (36 chars)", CONTROL),
+            ("planned", "Full planned prompt (~900 chars)", OURS),
+            ("planned_short", "Planned, cut to first two sentences (~400 chars)", MUTED)]
 
     fig, ax = plt.subplots(figsize=(9.4, 4.6), dpi=200)
     fig.patch.set_facecolor(SURFACE)
@@ -167,20 +168,21 @@ def figure_clip() -> Path:
                         ha="center", fontsize=8, color=INK)
 
     ax.set_xticks(list(x))
-    ax.set_xticklabels([DIM_ZH[d] for d in DIMS], fontsize=10, color=INK)
+    ax.set_xticklabels([DIM_LABEL[d] for d in DIMS], fontsize=10, color=INK)
     ax.set_ylim(0, 5.6)
     ax.set_yticks(range(0, 6))
-    ax.set_ylabel("单镜评分（VLM 判定，1–5）", fontsize=10, color=INK)
+    ax.set_ylabel("Single-clip score (VLM, 1-5)", fontsize=10, color=INK)
     ax.legend(frameon=False, fontsize=9, loc="upper center", ncol=3,
               bbox_to_anchor=(0.5, -0.13))
     ax.set_title(
-        "反面结果：单镜画质上，原始 brief 反而更好；把提示词截短只补回 0.08，长度不是主因\n"
-        "四维均值 4.18（brief）/ 3.68（完整）/ 3.75（截短），brief 在 8 格中胜 6 格",
+        "Negative result: on a single clip the bare brief scores higher than our planned prompt.\n"
+        "Trimming the prompt recovers only 0.075, so length is not the cause\n"
+        "Four-dim mean: brief 4.18 / full 3.68 / trimmed 3.75 - brief wins 6 of 8 cells",
         fontsize=11.5, color=INK, loc="left", pad=14)
 
     fig.text(0.012, 0.015,
-             "口径：两侧同模型、同 832×480、同 seed 0–4，唯一变量是提示词来源。"
-             "数据：bench/results/tier3a_ab/judge/*.json。",
+             "Same model, same 832x480, same seeds 0-4 on both arms; the only variable is where the prompt "
+             "comes from. Data: bench/results/tier3a_ab/judge/*.json.",
              fontsize=7.6, color=MUTED)
     fig.tight_layout(rect=(0, 0.05, 1, 1))
     out = FIG / "tier3a_clip.png"
@@ -198,15 +200,15 @@ def figure_workflow() -> Path:
     fig, ax = plt.subplots(figsize=(9.4, 3.1), dpi=200)
     fig.patch.set_facecolor(SURFACE)
     ax.axis("off")
-    ax.set_title("这一层两侧各自交付了什么", fontsize=11.5, color=INK, loc="left", pad=10)
+    ax.set_title("What each side delivers at this layer", fontsize=11.5, color=INK, loc="left", pad=10)
 
     table = [
-        ["项", "逐镜独立", "编排层主导"],
-        ["每集镜数", "5", "5"],
-        ["镜与镜之间传递的信息", "无", "角色外貌锚点（逐字复述）"],
-        ["画面之外还产出", "无", "剧本、分镜表、运动提示词"],
-        ["单集渲染耗时（CogVideoX）", "约 5×70s", "约 5×70s + 规划约 3min"],
-        ["跨镜角色一致性均值", "2.00", "4.17"],
+        ["Item", "Independent shots", "Orchestrated"],
+        ["Shots per episode", "5", "5"],
+        ["State passed between shots", "none", "appearance anchor (verbatim)"],
+        ["Produced beyond the picture", "none", "script, storyboard, per-shot prompt"],
+        ["Render time (CogVideoX)", "~5x70s", "~5x70s + ~3min planning"],
+        ["Mean cross-shot consistency", "2.00", "4.17"],
     ]
     tab = ax.table(cellText=table[1:], colLabels=table[0], cellLoc="left",
                    loc="upper left", colWidths=[0.30, 0.26, 0.40])
@@ -221,7 +223,8 @@ def figure_workflow() -> Path:
             cell.get_text().set_fontweight("bold")
 
     fig.text(0.012, 0.02,
-             "一致性数值来自 tier3a_story 实验；耗时为实测 wall-clock，非估算。",
+             "Consistency values come from the tier3a_story experiment; timings are measured wall-clock, "
+             "not estimates.",
              fontsize=7.6, color=MUTED)
     fig.tight_layout(rect=(0, 0.05, 1, 1))
     out = FIG / "tier3a_workflow.png"
