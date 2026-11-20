@@ -1,5 +1,11 @@
 # Identity as Text, Identity as Pixels
 
+> **Status.** This document records the single-pass experiment: each story was
+> measured once. The repeated-measure version — three repeats per cell, histograms,
+> paired tests — is [`technical_report.md`](technical_report.md), and its numbers
+> supersede the headline figures here (2.28 → 4.61 over 18 paired episodes).
+> The single-pass results remain valid for what they measured.
+
 ### A controlled study of multi-shot video orchestration on open-weight models
 
 ---

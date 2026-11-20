@@ -1,0 +1,632 @@
+{
+  "experiment_a": {
+    "cogvideox5b": {
+      "arms": {
+        "independent": {
+          "n": 9,
+          "mean": 1.222,
+          "sd": 0.667,
+          "min": 1.0,
+          "median": 1.0,
+          "max": 3.0,
+          "histogram": {
+            "1": 8,
+            "2": 0,
+            "3": 1,
+            "4": 0,
+            "5": 0
+          }
+        },
+        "planned": {
+          "n": 9,
+          "mean": 4.556,
+          "sd": 0.527,
+          "min": 4.0,
+          "median": 5.0,
+          "max": 5.0,
+          "histogram": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 4,
+            "5": 5
+          }
+        }
+      },
+      "pairs": {
+        "n": 9,
+        "mean_diff": 3.333,
+        "sd_diff": 1.0,
+        "ci95": [
+          2.667,
+          3.889
+        ],
+        "sign_test": {
+          "wins": 9,
+          "ties": 0,
+          "losses": 0,
+          "n": 9,
+          "p_greater": 0.00195312,
+          "p_less": 1.0,
+          "p_two_sided": 0.00390625
+        },
+        "sign_flip_p": 0.003906,
+        "wilson_win_rate": [
+          0.701,
+          1.0
+        ],
+        "mean_of_pair_means": 2.889
+      },
+      "planned_traits": {
+        "NONE": 5,
+        "Hairstyle": 2,
+        "Face and Facial Features": 1,
+        "Clothing": 1
+      },
+      "render_seconds": {
+        "n": 90,
+        "mean": 53.078,
+        "sd": 0.342,
+        "min": 52.3,
+        "median": 53.1,
+        "max": 54.1,
+        "histogram": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0
+        }
+      },
+      "plan_seconds": [
+        241.2,
+        244.7,
+        245.1,
+        246.1,
+        246.5,
+        247.9,
+        248.8,
+        254.3,
+        267.1
+      ]
+    },
+    "wan21_1_3b": {
+      "arms": {
+        "independent": {
+          "n": 9,
+          "mean": 3.333,
+          "sd": 0.866,
+          "min": 2.0,
+          "median": 4.0,
+          "max": 4.0,
+          "histogram": {
+            "1": 0,
+            "2": 2,
+            "3": 2,
+            "4": 5,
+            "5": 0
+          }
+        },
+        "planned": {
+          "n": 9,
+          "mean": 4.667,
+          "sd": 0.5,
+          "min": 4.0,
+          "median": 5.0,
+          "max": 5.0,
+          "histogram": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 3,
+            "5": 6
+          }
+        }
+      },
+      "pairs": {
+        "n": 9,
+        "mean_diff": 1.333,
+        "sd_diff": 0.707,
+        "ci95": [
+          0.889,
+          1.778
+        ],
+        "sign_test": {
+          "wins": 8,
+          "ties": 1,
+          "losses": 0,
+          "n": 8,
+          "p_greater": 0.00390625,
+          "p_less": 1.0,
+          "p_two_sided": 0.0078125
+        },
+        "sign_flip_p": 0.007812,
+        "wilson_win_rate": [
+          0.565,
+          0.98
+        ],
+        "mean_of_pair_means": 4.0
+      },
+      "planned_traits": {
+        "NONE": 6,
+        "Hairstyle": 2,
+        "Face and Facial Features": 1
+      },
+      "render_seconds": {
+        "n": 90,
+        "mean": 41.974,
+        "sd": 0.38,
+        "min": 41.4,
+        "median": 41.9,
+        "max": 44.7,
+        "histogram": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0
+        }
+      },
+      "plan_seconds": [
+        241.2,
+        244.7,
+        245.1,
+        246.1,
+        246.5,
+        247.9,
+        248.8,
+        254.3,
+        267.1
+      ]
+    },
+    "pooled": {
+      "pairs": {
+        "n": 18,
+        "mean_diff": 2.333,
+        "sd_diff": 1.328,
+        "ci95": [
+          1.722,
+          2.944
+        ],
+        "sign_test": {
+          "wins": 17,
+          "ties": 1,
+          "losses": 0,
+          "n": 17,
+          "p_greater": 7.63e-06,
+          "p_less": 1.0,
+          "p_two_sided": 1.526e-05
+        },
+        "sign_flip_p": 1.5e-05,
+        "wilson_win_rate": [
+          0.742,
+          0.99
+        ]
+      }
+    }
+  },
+  "experiment_b": {
+    "models": {
+      "cogvideox5b": {
+        "brief": {
+          "four_dim_mean": 4.2,
+          "four_dim_sd": 0.696,
+          "dimensions": {
+            "imaging_quality": {
+              "mean": 4.4,
+              "sd": 0.894,
+              "values": [
+                5.0,
+                5.0,
+                5.0,
+                4.0,
+                3.0
+              ]
+            },
+            "aesthetic_quality": {
+              "mean": 3.8,
+              "sd": 0.447,
+              "values": [
+                4.0,
+                4.0,
+                3.0,
+                4.0,
+                4.0
+              ]
+            },
+            "temporal_consistency": {
+              "mean": 4.8,
+              "sd": 0.447,
+              "values": [
+                5.0,
+                5.0,
+                5.0,
+                4.0,
+                5.0
+              ]
+            },
+            "motion_effects": {
+              "mean": 3.8,
+              "sd": 0.447,
+              "values": [
+                3.0,
+                4.0,
+                4.0,
+                4.0,
+                4.0
+              ]
+            }
+          }
+        },
+        "planned": {
+          "four_dim_mean": 3.7,
+          "four_dim_sd": 0.979,
+          "dimensions": {
+            "imaging_quality": {
+              "mean": 3.2,
+              "sd": 0.837,
+              "values": [
+                2.0,
+                4.0,
+                3.0,
+                3.0,
+                4.0
+              ]
+            },
+            "aesthetic_quality": {
+              "mean": 3.4,
+              "sd": 1.14,
+              "values": [
+                2.0,
+                4.0,
+                3.0,
+                3.0,
+                5.0
+              ]
+            },
+            "temporal_consistency": {
+              "mean": 4.4,
+              "sd": 0.894,
+              "values": [
+                3.0,
+                5.0,
+                5.0,
+                5.0,
+                4.0
+              ]
+            },
+            "motion_effects": {
+              "mean": 3.8,
+              "sd": 0.837,
+              "values": [
+                5.0,
+                3.0,
+                4.0,
+                4.0,
+                3.0
+              ]
+            }
+          }
+        },
+        "planned_short": {
+          "four_dim_mean": 3.85,
+          "four_dim_sd": 0.813,
+          "dimensions": {
+            "imaging_quality": {
+              "mean": 3.6,
+              "sd": 0.894,
+              "values": [
+                5.0,
+                4.0,
+                3.0,
+                3.0,
+                3.0
+              ]
+            },
+            "aesthetic_quality": {
+              "mean": 3.6,
+              "sd": 0.548,
+              "values": [
+                3.0,
+                4.0,
+                4.0,
+                3.0,
+                4.0
+              ]
+            },
+            "temporal_consistency": {
+              "mean": 4.8,
+              "sd": 0.447,
+              "values": [
+                5.0,
+                5.0,
+                4.0,
+                5.0,
+                5.0
+              ]
+            },
+            "motion_effects": {
+              "mean": 3.4,
+              "sd": 0.548,
+              "values": [
+                3.0,
+                3.0,
+                4.0,
+                3.0,
+                4.0
+              ]
+            }
+          }
+        }
+      },
+      "wan21_1_3b": {
+        "brief": {
+          "four_dim_mean": 4.15,
+          "four_dim_sd": 0.671,
+          "dimensions": {
+            "imaging_quality": {
+              "mean": 4.2,
+              "sd": 0.837,
+              "values": [
+                5.0,
+                5.0,
+                4.0,
+                4.0,
+                3.0
+              ]
+            },
+            "aesthetic_quality": {
+              "mean": 3.8,
+              "sd": 0.447,
+              "values": [
+                4.0,
+                4.0,
+                3.0,
+                4.0,
+                4.0
+              ]
+            },
+            "temporal_consistency": {
+              "mean": 4.8,
+              "sd": 0.447,
+              "values": [
+                5.0,
+                5.0,
+                5.0,
+                4.0,
+                5.0
+              ]
+            },
+            "motion_effects": {
+              "mean": 3.8,
+              "sd": 0.447,
+              "values": [
+                3.0,
+                4.0,
+                4.0,
+                4.0,
+                4.0
+              ]
+            }
+          }
+        },
+        "planned": {
+          "four_dim_mean": 3.65,
+          "four_dim_sd": 0.875,
+          "dimensions": {
+            "imaging_quality": {
+              "mean": 3.0,
+              "sd": 0.707,
+              "values": [
+                2.0,
+                3.0,
+                3.0,
+                4.0,
+                3.0
+              ]
+            },
+            "aesthetic_quality": {
+              "mean": 3.2,
+              "sd": 0.447,
+              "values": [
+                3.0,
+                4.0,
+                3.0,
+                3.0,
+                3.0
+              ]
+            },
+            "temporal_consistency": {
+              "mean": 4.4,
+              "sd": 0.894,
+              "values": [
+                3.0,
+                5.0,
+                5.0,
+                5.0,
+                4.0
+              ]
+            },
+            "motion_effects": {
+              "mean": 4.0,
+              "sd": 0.707,
+              "values": [
+                5.0,
+                3.0,
+                4.0,
+                4.0,
+                4.0
+              ]
+            }
+          }
+        },
+        "planned_short": {
+          "four_dim_mean": 3.65,
+          "four_dim_sd": 0.813,
+          "dimensions": {
+            "imaging_quality": {
+              "mean": 3.4,
+              "sd": 0.548,
+              "values": [
+                4.0,
+                4.0,
+                3.0,
+                3.0,
+                3.0
+              ]
+            },
+            "aesthetic_quality": {
+              "mean": 3.0,
+              "sd": 0.0,
+              "values": [
+                3.0,
+                3.0,
+                3.0,
+                3.0,
+                3.0
+              ]
+            },
+            "temporal_consistency": {
+              "mean": 4.8,
+              "sd": 0.447,
+              "values": [
+                5.0,
+                5.0,
+                4.0,
+                5.0,
+                5.0
+              ]
+            },
+            "motion_effects": {
+              "mean": 3.4,
+              "sd": 0.548,
+              "values": [
+                3.0,
+                3.0,
+                4.0,
+                3.0,
+                4.0
+              ]
+            }
+          }
+        }
+      }
+    },
+    "paired": {
+      "cogvideox5b": {
+        "planned_minus_brief": {
+          "n": 5,
+          "mean": -0.5,
+          "sd": 0.468,
+          "ci95": [
+            -0.9,
+            -0.15
+          ],
+          "sign_test": {
+            "wins": 0,
+            "ties": 1,
+            "losses": 4,
+            "n": 4,
+            "p_greater": 1.0,
+            "p_less": 0.0625,
+            "p_two_sided": 0.125
+          },
+          "sign_flip_p": 0.125,
+          "per_clip": [
+            -1.25,
+            -0.5,
+            -0.5,
+            -0.25,
+            0.0
+          ]
+        },
+        "planned_short_minus_brief": {
+          "n": 5,
+          "mean": -0.35,
+          "sd": 0.224,
+          "ci95": [
+            -0.5,
+            -0.15
+          ],
+          "sign_test": {
+            "wins": 0,
+            "ties": 1,
+            "losses": 4,
+            "n": 4,
+            "p_greater": 1.0,
+            "p_less": 0.0625,
+            "p_two_sided": 0.125
+          },
+          "sign_flip_p": 0.125,
+          "per_clip": [
+            -0.25,
+            -0.5,
+            -0.5,
+            -0.5,
+            0.0
+          ]
+        }
+      },
+      "wan21_1_3b": {
+        "planned_minus_brief": {
+          "n": 5,
+          "mean": -0.5,
+          "sd": 0.395,
+          "ci95": [
+            -0.8,
+            -0.2
+          ],
+          "sign_test": {
+            "wins": 0,
+            "ties": 1,
+            "losses": 4,
+            "n": 4,
+            "p_greater": 1.0,
+            "p_less": 0.0625,
+            "p_two_sided": 0.125
+          },
+          "sign_flip_p": 0.125,
+          "per_clip": [
+            -1.0,
+            -0.75,
+            -0.25,
+            0.0,
+            -0.5
+          ]
+        },
+        "planned_short_minus_brief": {
+          "n": 5,
+          "mean": -0.5,
+          "sd": 0.177,
+          "ci95": [
+            -0.65,
+            -0.35
+          ],
+          "sign_test": {
+            "wins": 0,
+            "ties": 0,
+            "losses": 5,
+            "n": 5,
+            "p_greater": 1.0,
+            "p_less": 0.03125,
+            "p_two_sided": 0.0625
+          },
+          "sign_flip_p": 0.0625,
+          "per_clip": [
+            -0.5,
+            -0.75,
+            -0.5,
+            -0.5,
+            -0.25
+          ]
+        }
+      }
+    },
+    "best_arm_per_cell": {
+      "brief": 7,
+      "planned": 1,
+      "planned_short": 0
+    },
+    "cells": 8
+  }
+}

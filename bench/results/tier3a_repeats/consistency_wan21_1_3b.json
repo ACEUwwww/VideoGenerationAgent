@@ -1,0 +1,506 @@
+[
+  {
+    "score": 3.0,
+    "changed": "Clothing",
+    "why": "The main character's clothing changes in color and style across the frames, while other traits like body build and hairstyle remain consistent.",
+    "raw": "**SCORE:** 3  \n**CHANGED:** Clothing  \n**WHY:** The main character's clothing changes in color and style across the frames, while other traits like body build and hairstyle remain consistent.",
+    "label": "independent:wan21_1_3b:b0:r0",
+    "shots": 5,
+    "elapsed_s": 2.7,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 0,
+    "repeat": 0,
+    "prompt_chars": [
+      49,
+      49,
+      49,
+      49,
+      49
+    ],
+    "clip_seconds": [
+      42.7,
+      41.9,
+      42.0,
+      42.1,
+      41.8
+    ],
+    "plan_seconds": 267.1
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently displays the same face, hairstyle, body build, height, and dark blue uniform across all frames.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently displays the same face, hairstyle, body build, height, and dark blue uniform across all frames.",
+    "label": "planned:wan21_1_3b:b0:r0",
+    "shots": 5,
+    "elapsed_s": 1.6,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 0,
+    "repeat": 0,
+    "prompt_chars": [
+      704,
+      879,
+      846,
+      830,
+      790
+    ],
+    "clip_seconds": [
+      41.9,
+      43.1,
+      42.1,
+      42.0,
+      42.2
+    ],
+    "plan_seconds": 267.1
+  },
+  {
+    "score": 4.0,
+    "changed": "Face and Facial Features",
+    "why": "The main person's face is consistently obscured or silhouetted, making it difficult to confirm facial features across all frames, but other traits like body build, height, and clothing remain consistent.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Face and Facial Features  \n**WHY:** The main person's face is consistently obscured or silhouetted, making it difficult to confirm facial features across all frames, but other traits like body build, height, and clothing remain consistent.",
+    "label": "independent:wan21_1_3b:b0:r1",
+    "shots": 5,
+    "elapsed_s": 3.6,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 0,
+    "repeat": 1,
+    "prompt_chars": [
+      49,
+      49,
+      49,
+      49,
+      49
+    ],
+    "clip_seconds": [
+      42.0,
+      41.9,
+      41.7,
+      41.6,
+      44.7
+    ],
+    "plan_seconds": 246.5
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames, indicating no change in identity.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames, indicating no change in identity.",
+    "label": "planned:wan21_1_3b:b0:r1",
+    "shots": 5,
+    "elapsed_s": 2.8,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 0,
+    "repeat": 1,
+    "prompt_chars": [
+      705,
+      712,
+      779,
+      883,
+      849
+    ],
+    "clip_seconds": [
+      41.9,
+      41.9,
+      42.1,
+      42.0,
+      42.2
+    ],
+    "plan_seconds": 246.5
+  },
+  {
+    "score": 4.0,
+    "changed": "Hairstyle",
+    "why": "The main character's hairstyle appears slightly different across some frames, but overall, the face, body build, height, and clothing remain consistent.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Hairstyle  \n**WHY:** The main character's hairstyle appears slightly different across some frames, but overall, the face, body build, height, and clothing remain consistent.",
+    "label": "independent:wan21_1_3b:b0:r2",
+    "shots": 5,
+    "elapsed_s": 2.9,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 0,
+    "repeat": 2,
+    "prompt_chars": [
+      49,
+      49,
+      49,
+      49,
+      49
+    ],
+    "clip_seconds": [
+      42.0,
+      41.9,
+      41.8,
+      42.3,
+      42.2
+    ],
+    "plan_seconds": 248.8
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual's face, hairstyle, body build, height, and clothing remain consistent across all frames, indicating it is the same person.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual's face, hairstyle, body build, height, and clothing remain consistent across all frames, indicating it is the same person.",
+    "label": "planned:wan21_1_3b:b0:r2",
+    "shots": 5,
+    "elapsed_s": 2.8,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 0,
+    "repeat": 2,
+    "prompt_chars": [
+      773,
+      764,
+      696,
+      831,
+      894
+    ],
+    "clip_seconds": [
+      42.1,
+      42.2,
+      41.8,
+      41.8,
+      41.7
+    ],
+    "plan_seconds": 248.8
+  },
+  {
+    "score": 2.0,
+    "changed": "Clothing",
+    "why": "The main person's clothing changes significantly across the frames, including different colors, styles, and accessories like hats and vests.",
+    "raw": "**SCORE:** 2  \n**CHANGED:** Clothing  \n**WHY:** The main person's clothing changes significantly across the frames, including different colors, styles, and accessories like hats and vests.",
+    "label": "independent:wan21_1_3b:b1:r0",
+    "shots": 5,
+    "elapsed_s": 2.7,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 1,
+    "repeat": 0,
+    "prompt_chars": [
+      36,
+      36,
+      36,
+      36,
+      36
+    ],
+    "clip_seconds": [
+      42.1,
+      41.9,
+      41.8,
+      42.1,
+      41.9
+    ],
+    "plan_seconds": 254.3
+  },
+  {
+    "score": 4.0,
+    "changed": "Hairstyle",
+    "why": "The main character's hairstyle appears slightly different in some frames, but overall, the face, body build, height, and clothing remain consistent across the shots.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Hairstyle  \n**WHY:** The main character's hairstyle appears slightly different in some frames, but overall, the face, body build, height, and clothing remain consistent across the shots.",
+    "label": "planned:wan21_1_3b:b1:r0",
+    "shots": 5,
+    "elapsed_s": 3.0,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 1,
+    "repeat": 0,
+    "prompt_chars": [
+      911,
+      724,
+      711,
+      775,
+      954
+    ],
+    "clip_seconds": [
+      41.9,
+      42.2,
+      41.7,
+      41.7,
+      41.6
+    ],
+    "plan_seconds": 254.3
+  },
+  {
+    "score": 2.0,
+    "changed": "Clothing",
+    "why": "The main person's clothing changes significantly across the frames, including different colors and types of garments, indicating different individuals or costumes.",
+    "raw": "**SCORE:** 2  \n**CHANGED:** Clothing  \n**WHY:** The main person's clothing changes significantly across the frames, including different colors and types of garments, indicating different individuals or costumes.",
+    "label": "independent:wan21_1_3b:b1:r1",
+    "shots": 5,
+    "elapsed_s": 1.7,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 1,
+    "repeat": 1,
+    "prompt_chars": [
+      36,
+      36,
+      36,
+      36,
+      36
+    ],
+    "clip_seconds": [
+      42.4,
+      42.0,
+      41.8,
+      42.0,
+      42.0
+    ],
+    "plan_seconds": 247.9
+  },
+  {
+    "score": 4.0,
+    "changed": "Hairstyle",
+    "why": "The main character's hairstyle varies slightly across the frames, but the face, body build, height, and clothing remain consistent.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Hairstyle  \n**WHY:** The main character's hairstyle varies slightly across the frames, but the face, body build, height, and clothing remain consistent.",
+    "label": "planned:wan21_1_3b:b1:r1",
+    "shots": 5,
+    "elapsed_s": 1.7,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 1,
+    "repeat": 1,
+    "prompt_chars": [
+      737,
+      753,
+      690,
+      730,
+      793
+    ],
+    "clip_seconds": [
+      41.8,
+      41.9,
+      42.0,
+      41.9,
+      41.9
+    ],
+    "plan_seconds": 247.9
+  },
+  {
+    "score": 4.0,
+    "changed": "Hairstyle",
+    "why": "The main person's hairstyle appears to change between shots, while other traits like face, body build, and clothing remain consistent.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Hairstyle  \n**WHY:** The main person's hairstyle appears to change between shots, while other traits like face, body build, and clothing remain consistent.",
+    "label": "independent:wan21_1_3b:b1:r2",
+    "shots": 5,
+    "elapsed_s": 1.7,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 1,
+    "repeat": 2,
+    "prompt_chars": [
+      36,
+      36,
+      36,
+      36,
+      36
+    ],
+    "clip_seconds": [
+      42.3,
+      41.6,
+      41.8,
+      41.8,
+      42.0
+    ],
+    "plan_seconds": 244.7
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently appears with the same dark hair, build, and distinctive hoodie with orange stripes across all frames.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently appears with the same dark hair, build, and distinctive hoodie with orange stripes across all frames.",
+    "label": "planned:wan21_1_3b:b1:r2",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 1,
+    "repeat": 2,
+    "prompt_chars": [
+      761,
+      716,
+      709,
+      664,
+      835
+    ],
+    "clip_seconds": [
+      42.4,
+      42.0,
+      41.8,
+      41.8,
+      41.8
+    ],
+    "plan_seconds": 244.7
+  },
+  {
+    "score": 4.0,
+    "changed": "Clothing",
+    "why": "The main character's silhouette remains consistent in terms of body build and height, but the clothing appears to change slightly in texture and detail across the frames, especially noticeable in Shot 3 and Shot 4.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Clothing  \n**WHY:** The main character's silhouette remains consistent in terms of body build and height, but the clothing appears to change slightly in texture and detail across the frames, especially noticeable in Shot 3 and Shot 4.",
+    "label": "independent:wan21_1_3b:b2:r0",
+    "shots": 5,
+    "elapsed_s": 2.2,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 2,
+    "repeat": 0,
+    "prompt_chars": [
+      26,
+      26,
+      26,
+      26,
+      26
+    ],
+    "clip_seconds": [
+      42.0,
+      41.8,
+      41.9,
+      41.7,
+      42.0
+    ],
+    "plan_seconds": 241.2
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames.",
+    "label": "planned:wan21_1_3b:b2:r0",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 2,
+    "repeat": 0,
+    "prompt_chars": [
+      719,
+      804,
+      747,
+      694,
+      680
+    ],
+    "clip_seconds": [
+      41.9,
+      41.7,
+      41.9,
+      41.8,
+      41.4
+    ],
+    "plan_seconds": 241.2
+  },
+  {
+    "score": 4.0,
+    "changed": "Clothing",
+    "why": "The main character's jacket changes from a dark suit to a lighter blue jacket across the frames, while other traits like hairstyle, body build, and height remain consistent.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Clothing  \n**WHY:** The main character's jacket changes from a dark suit to a lighter blue jacket across the frames, while other traits like hairstyle, body build, and height remain consistent.",
+    "label": "independent:wan21_1_3b:b2:r1",
+    "shots": 5,
+    "elapsed_s": 1.9,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 2,
+    "repeat": 1,
+    "prompt_chars": [
+      26,
+      26,
+      26,
+      26,
+      26
+    ],
+    "clip_seconds": [
+      41.8,
+      42.1,
+      42.1,
+      42.1,
+      42.3
+    ],
+    "plan_seconds": 246.1
+  },
+  {
+    "score": 4.0,
+    "changed": "Face and Facial Features",
+    "why": "The main character's face appears consistent across most shots, but there is noticeable variation in facial expressions and lighting, which slightly affects the consistency.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Face and Facial Features  \n**WHY:** The main character's face appears consistent across most shots, but there is noticeable variation in facial expressions and lighting, which slightly affects the consistency.",
+    "label": "planned:wan21_1_3b:b2:r1",
+    "shots": 5,
+    "elapsed_s": 1.8,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 2,
+    "repeat": 1,
+    "prompt_chars": [
+      900,
+      970,
+      706,
+      775,
+      814
+    ],
+    "clip_seconds": [
+      41.7,
+      41.8,
+      41.8,
+      41.9,
+      41.8
+    ],
+    "plan_seconds": 246.1
+  },
+  {
+    "score": 3.0,
+    "changed": "Clothing",
+    "why": "The main character's clothing changes significantly across the frames, including jacket color and style, while other traits like body build and height remain consistent.",
+    "raw": "**SCORE:** 3  \n**CHANGED:** Clothing  \n**WHY:** The main character's clothing changes significantly across the frames, including jacket color and style, while other traits like body build and height remain consistent.",
+    "label": "independent:wan21_1_3b:b2:r2",
+    "shots": 5,
+    "elapsed_s": 1.8,
+    "arm": "independent",
+    "model": "wan21_1_3b",
+    "brief_index": 2,
+    "repeat": 2,
+    "prompt_chars": [
+      26,
+      26,
+      26,
+      26,
+      26
+    ],
+    "clip_seconds": [
+      42.1,
+      42.0,
+      42.2,
+      42.1,
+      42.0
+    ],
+    "plan_seconds": 245.1
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames, indicating no change in identity.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames, indicating no change in identity.",
+    "label": "planned:wan21_1_3b:b2:r2",
+    "shots": 5,
+    "elapsed_s": 1.7,
+    "arm": "planned",
+    "model": "wan21_1_3b",
+    "brief_index": 2,
+    "repeat": 2,
+    "prompt_chars": [
+      814,
+      924,
+      692,
+      820,
+      780
+    ],
+    "clip_seconds": [
+      41.8,
+      41.7,
+      41.6,
+      41.7,
+      41.5
+    ],
+    "plan_seconds": 245.1
+  }
+]

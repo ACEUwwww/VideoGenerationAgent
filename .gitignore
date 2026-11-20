@@ -58,5 +58,14 @@ bench/results/om_control/*
 !bench/results/om_control/ours_matched/
 bench/results/om_control/ours_matched/*
 !bench/results/om_control/ours_matched/*.jsonl
+# Repeated-measure study: scores, render records and cached planner output.
+# The 78 MB of clips they describe stay local.
+!bench/results/tier3a_repeats/
+bench/results/tier3a_repeats/*
+!bench/results/tier3a_repeats/*.json
+!bench/results/tier3a_repeats/*.jsonl
+!bench/results/tier3a_repeats/plans/
+bench/results/tier3a_repeats/plans/*
+!bench/results/tier3a_repeats/plans/*.json
 bench/_smoke/
 bench/logs/

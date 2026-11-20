@@ -1,0 +1,506 @@
+[
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "The frames lack clear visual details to identify any consistent traits such as face, hairstyle, body build, height, or clothing.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: The frames lack clear visual details to identify any consistent traits such as face, hairstyle, body build, height, or clothing.",
+    "label": "independent:cogvideox5b:b0:r0",
+    "shots": 5,
+    "elapsed_s": 1.6,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 0,
+    "repeat": 0,
+    "prompt_chars": [
+      49,
+      49,
+      49,
+      49,
+      49
+    ],
+    "clip_seconds": [
+      52.5,
+      53.0,
+      53.2,
+      53.0,
+      53.0
+    ],
+    "plan_seconds": 267.1
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "All frames show the same individual with consistent facial features, hairstyle, body build, height, and blue uniform with visible badges and name tag.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** All frames show the same individual with consistent facial features, hairstyle, body build, height, and blue uniform with visible badges and name tag.",
+    "label": "planned:cogvideox5b:b0:r0",
+    "shots": 5,
+    "elapsed_s": 1.7,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 0,
+    "repeat": 0,
+    "prompt_chars": [
+      704,
+      879,
+      846,
+      830,
+      790
+    ],
+    "clip_seconds": [
+      53.2,
+      53.3,
+      53.2,
+      53.1,
+      52.7
+    ],
+    "plan_seconds": 267.1
+  },
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "All frames are too blurry to discern any consistent traits such as face, hairstyle, body build, height, or clothing.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: All frames are too blurry to discern any consistent traits such as face, hairstyle, body build, height, or clothing.",
+    "label": "independent:cogvideox5b:b0:r1",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 0,
+    "repeat": 1,
+    "prompt_chars": [
+      49,
+      49,
+      49,
+      49,
+      49
+    ],
+    "clip_seconds": [
+      53.1,
+      53.3,
+      53.2,
+      52.5,
+      53.1
+    ],
+    "plan_seconds": 246.5
+  },
+  {
+    "score": 4.0,
+    "changed": "Hairstyle",
+    "why": "The main character's hairstyle appears wet and more disheveled in Shot 4 compared to the other frames, while all other traits remain consistent.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Hairstyle  \n**WHY:** The main character's hairstyle appears wet and more disheveled in Shot 4 compared to the other frames, while all other traits remain consistent.",
+    "label": "planned:cogvideox5b:b0:r1",
+    "shots": 5,
+    "elapsed_s": 1.8,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 0,
+    "repeat": 1,
+    "prompt_chars": [
+      705,
+      712,
+      779,
+      883,
+      849
+    ],
+    "clip_seconds": [
+      53.7,
+      53.2,
+      52.7,
+      53.6,
+      52.6
+    ],
+    "plan_seconds": 246.5
+  },
+  {
+    "score": 3.0,
+    "changed": "Face and Facial Features",
+    "why": "The face and facial features appear inconsistent across the frames, with varying levels of focus and detail, making it difficult to confirm identity.",
+    "raw": "show parts of the face in more detail than others, but the overall consistency is lacking.  \n- **Hairstyle:** While there seems to be long blonde hair in some frames, the visibility is limited due to blurriness.  \n- **Body Build and Height:** There is no clear view of the body build or height in any of the frames provided.  \n- **Clothing:** The garment appears consistent in color and type (white, possibly a sweater), but the lack of clear visuals makes it hard to definitively confirm.  \n\nGiven the inconsistencies in facial features and the limited visibility of other traits, the score reflects",
+    "label": "independent:cogvideox5b:b0:r2",
+    "shots": 5,
+    "elapsed_s": 7.1,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 0,
+    "repeat": 2,
+    "prompt_chars": [
+      49,
+      49,
+      49,
+      49,
+      49
+    ],
+    "clip_seconds": [
+      53.4,
+      52.5,
+      53.2,
+      53.3,
+      53.1
+    ],
+    "plan_seconds": 248.8
+  },
+  {
+    "score": 4.0,
+    "changed": "Hairstyle",
+    "why": "The main character's hairstyle appears wet and slicked back in all frames, but there is slight variation in how it falls over the forehead, indicating some change in styling or movement.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Hairstyle  \n**WHY:** The main character's hairstyle appears wet and slicked back in all frames, but there is slight variation in how it falls over the forehead, indicating some change in styling or movement.",
+    "label": "planned:cogvideox5b:b0:r2",
+    "shots": 5,
+    "elapsed_s": 2.0,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 0,
+    "repeat": 2,
+    "prompt_chars": [
+      773,
+      764,
+      696,
+      831,
+      894
+    ],
+    "clip_seconds": [
+      52.8,
+      53.1,
+      53.3,
+      53.0,
+      52.6
+    ],
+    "plan_seconds": 248.8
+  },
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "All frames lack visible content to assess any character traits, making it impossible to determine consistency.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: All frames lack visible content to assess any character traits, making it impossible to determine consistency.",
+    "label": "independent:cogvideox5b:b1:r0",
+    "shots": 5,
+    "elapsed_s": 1.2,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 1,
+    "repeat": 0,
+    "prompt_chars": [
+      36,
+      36,
+      36,
+      36,
+      36
+    ],
+    "clip_seconds": [
+      53.4,
+      52.6,
+      53.7,
+      52.8,
+      53.4
+    ],
+    "plan_seconds": 254.3
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently displays the same facial features, hairstyle, body build, height, and clothing across all frames.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently displays the same facial features, hairstyle, body build, height, and clothing across all frames.",
+    "label": "planned:cogvideox5b:b1:r0",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 1,
+    "repeat": 0,
+    "prompt_chars": [
+      911,
+      724,
+      711,
+      775,
+      954
+    ],
+    "clip_seconds": [
+      53.4,
+      53.3,
+      52.6,
+      53.0,
+      53.6
+    ],
+    "plan_seconds": 254.3
+  },
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "No identifiable traits of a person (face, hairstyle, body build, height, or clothing) are visible in any of the frames provided.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: No identifiable traits of a person (face, hairstyle, body build, height, or clothing) are visible in any of the frames provided.",
+    "label": "independent:cogvideox5b:b1:r1",
+    "shots": 5,
+    "elapsed_s": 1.6,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 1,
+    "repeat": 1,
+    "prompt_chars": [
+      36,
+      36,
+      36,
+      36,
+      36
+    ],
+    "clip_seconds": [
+      53.0,
+      52.7,
+      53.6,
+      54.1,
+      53.4
+    ],
+    "plan_seconds": 247.9
+  },
+  {
+    "score": 4.0,
+    "changed": "Face and Facial Features",
+    "why": "The main character's face and facial features appear consistent across most frames, but there is some variation in expression and visibility due to lighting and fog effects.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Face and Facial Features  \n**WHY:** The main character's face and facial features appear consistent across most frames, but there is some variation in expression and visibility due to lighting and fog effects.",
+    "label": "planned:cogvideox5b:b1:r1",
+    "shots": 5,
+    "elapsed_s": 1.9,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 1,
+    "repeat": 1,
+    "prompt_chars": [
+      737,
+      753,
+      690,
+      730,
+      793
+    ],
+    "clip_seconds": [
+      52.3,
+      53.1,
+      53.1,
+      53.1,
+      52.7
+    ],
+    "plan_seconds": 247.9
+  },
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "All frames are too blurred to discern any identifiable traits such as face, hairstyle, body build, height, or clothing.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: All frames are too blurred to discern any identifiable traits such as face, hairstyle, body build, height, or clothing.",
+    "label": "independent:cogvideox5b:b1:r2",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 1,
+    "repeat": 2,
+    "prompt_chars": [
+      36,
+      36,
+      36,
+      36,
+      36
+    ],
+    "clip_seconds": [
+      53.1,
+      53.2,
+      52.9,
+      52.8,
+      53.2
+    ],
+    "plan_seconds": 244.7
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently displays the same face, hairstyle, body build, height, and clothing across all frames.",
+    "label": "planned:cogvideox5b:b1:r2",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 1,
+    "repeat": 2,
+    "prompt_chars": [
+      761,
+      716,
+      709,
+      664,
+      835
+    ],
+    "clip_seconds": [
+      52.9,
+      53.4,
+      52.7,
+      53.3,
+      53.3
+    ],
+    "plan_seconds": 244.7
+  },
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "No identifiable traits of a person are visible in any of the frames provided.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: No identifiable traits of a person are visible in any of the frames provided.",
+    "label": "independent:cogvideox5b:b2:r0",
+    "shots": 5,
+    "elapsed_s": 1.2,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 2,
+    "repeat": 0,
+    "prompt_chars": [
+      26,
+      26,
+      26,
+      26,
+      26
+    ],
+    "clip_seconds": [
+      53.3,
+      52.8,
+      53.2,
+      53.4,
+      53.0
+    ],
+    "plan_seconds": 241.2
+  },
+  {
+    "score": 4.0,
+    "changed": "Clothing",
+    "why": "The main character's shirt color changes from dark to light between some frames, while other traits like face, hairstyle, body build, and height remain consistent.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Clothing  \n**WHY:** The main character's shirt color changes from dark to light between some frames, while other traits like face, hairstyle, body build, and height remain consistent.",
+    "label": "planned:cogvideox5b:b2:r0",
+    "shots": 5,
+    "elapsed_s": 1.8,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 2,
+    "repeat": 0,
+    "prompt_chars": [
+      719,
+      804,
+      747,
+      694,
+      680
+    ],
+    "clip_seconds": [
+      52.6,
+      53.4,
+      52.6,
+      53.3,
+      52.6
+    ],
+    "plan_seconds": 241.2
+  },
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "No identifiable traits such as face, hairstyle, body build, height, or clothing are visible in any of the frames provided.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: No identifiable traits such as face, hairstyle, body build, height, or clothing are visible in any of the frames provided.",
+    "label": "independent:cogvideox5b:b2:r1",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 2,
+    "repeat": 1,
+    "prompt_chars": [
+      26,
+      26,
+      26,
+      26,
+      26
+    ],
+    "clip_seconds": [
+      53.2,
+      53.4,
+      53.2,
+      52.7,
+      53.3
+    ],
+    "plan_seconds": 246.1
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "The individual consistently displays the same face, hairstyle, body build, height, and attire across all frames, indicating no change in identity.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** The individual consistently displays the same face, hairstyle, body build, height, and attire across all frames, indicating no change in identity.",
+    "label": "planned:cogvideox5b:b2:r1",
+    "shots": 5,
+    "elapsed_s": 1.7,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 2,
+    "repeat": 1,
+    "prompt_chars": [
+      900,
+      970,
+      706,
+      775,
+      814
+    ],
+    "clip_seconds": [
+      53.3,
+      53.0,
+      52.8,
+      53.4,
+      52.6
+    ],
+    "plan_seconds": 246.1
+  },
+  {
+    "score": 1.0,
+    "changed": "NONE",
+    "why": "The images are too blurred and lack discernible details to identify any consistent traits across the frames.",
+    "raw": "SCORE: 1  \nCHANGED: NONE  \nWHY: The images are too blurred and lack discernible details to identify any consistent traits across the frames.",
+    "label": "independent:cogvideox5b:b2:r2",
+    "shots": 5,
+    "elapsed_s": 1.3,
+    "arm": "independent",
+    "model": "cogvideox5b",
+    "brief_index": 2,
+    "repeat": 2,
+    "prompt_chars": [
+      26,
+      26,
+      26,
+      26,
+      26
+    ],
+    "clip_seconds": [
+      53.4,
+      52.6,
+      53.3,
+      53.3,
+      53.0
+    ],
+    "plan_seconds": 245.1
+  },
+  {
+    "score": 5.0,
+    "changed": "NONE",
+    "why": "All frames show the same individual with consistent face, hairstyle, body build, height, and clothing throughout the sequence.",
+    "raw": "**SCORE:** 5  \n**CHANGED:** NONE  \n**WHY:** All frames show the same individual with consistent face, hairstyle, body build, height, and clothing throughout the sequence.",
+    "label": "planned:cogvideox5b:b2:r2",
+    "shots": 5,
+    "elapsed_s": 1.5,
+    "arm": "planned",
+    "model": "cogvideox5b",
+    "brief_index": 2,
+    "repeat": 2,
+    "prompt_chars": [
+      814,
+      924,
+      692,
+      820,
+      780
+    ],
+    "clip_seconds": [
+      52.7,
+      53.0,
+      53.6,
+      53.3,
+      52.5
+    ],
+    "plan_seconds": 245.1
+  }
+]

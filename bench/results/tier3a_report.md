@@ -1,5 +1,11 @@
 # Tier 3a: What the Orchestration Layer Actually Buys
 
+> **Status.** This document records the single-pass experiment: each story was
+> measured once. The repeated-measure version — three repeats per cell, histograms,
+> paired tests — is [`technical_report.md`](technical_report.md), and its numbers
+> supersede the headline figures here (2.28 → 4.61 over 18 paired episodes).
+> The single-pass results remain valid for what they measured.
+
 **The result up front.** On 1.3B–5B open-weight video models, our orchestration layer **does not improve single-clip quality — it scores slightly below handing the creative brief straight to the model**. What it does is raise **cross-shot character consistency from 2.00 to 4.17** (5-point scale, n=6 stories, 5 wins / 1 tie / 0 losses, one-sided sign test p=0.031). The layer does not exist to make one shot look better; it exists to make the same person appear in all five.
 
 Both results are reported together because they come from the same set of renders. Reporting only the first is a negative paper. Reporting only the second is selective reporting.
