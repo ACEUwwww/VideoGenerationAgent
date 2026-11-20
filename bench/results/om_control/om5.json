@@ -1,0 +1,11 @@
+[
+  {
+    "score": 2.0,
+    "changed": "Face and Facial Features",
+    "why": "The face and facial features are inconsistent across the frames, with some showing a person wearing glasses and others showing indistinct or obscured faces.",
+    "raw": "**SCORE:** 2  \n**CHANGED:** Face and Facial Features  \n**WHY:** The face and facial features are inconsistent across the frames, with some showing a person wearing glasses and others showing indistinct or obscured faces.",
+    "label": "openmontage:omfix",
+    "shots": 5,
+    "elapsed_s": 3.0
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "judge": "qwen2.5-vl-32b-local @ http://127.0.0.1:8791/v1",
+  "question": "同集各镜的画面里，是否为同一个人（脸/发型/体型/服装）；明确排除机位、背景、打光、调色",
+  "scale": "1-5",
+  "source_clips": "bench/results/tier3a_story/clips.jsonl",
+  "note": "每组判分一次；温度 0，同一组重复提问此前验证过答案稳定",
+  "per_story": {
+    "cogvideox5b": {
+      "0": {
+        "independent": 1,
+        "planned": 5,
+        "changed_independent": "NONE",
+        "changed_planned": "NONE"
+      },
+      "1": {
+        "independent": 1,
+        "planned": 2,
+        "changed_independent": "NONE",
+        "changed_planned": "Face and Facial Features"
+      },
+      "2": {
+        "independent": 1,
+        "planned": 5,
+        "changed_independent": "NONE",
+        "changed_planned": "NONE"
+      }
+    },
+    "wan21_1_3b": {
+      "0": {
+        "independent": 3,
+        "planned": 4,
+        "changed_independent": "Clothing",
+        "changed_planned": "Hairstyle"
+      },
+      "1": {
+        "independent": 2,
+        "planned": 5,
+        "changed_independent": "Clothing",
+        "changed_planned": "NONE"
+      },
+      "2": {
+        "independent": 4,
+        "planned": 4,
+        "changed_independent": "Clothing",
+        "changed_planned": "Hairstyle"
+      }
+    }
+  }
+}

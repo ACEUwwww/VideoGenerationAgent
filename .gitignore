@@ -34,5 +34,29 @@ bench/results/
 !bench/results/
 bench/results/*
 !bench/results/tier3a_report.md
+# Evidence for the control arm: which claims are measured and which are still
+# open. Small text, and the report cites it directly.
+!bench/results/om_control_notes.md
+# The paper-level write-up: workflow, experiments, figures, and the
+# mechanism analysis against the reference workflow.
+!bench/results/orchestration_report.md
+# Text evidence behind the figures: judge verdicts and render records only.
+# The media they describe is tens of MB of renders and stays local.
+!bench/results/tier3a_story/
+bench/results/tier3a_story/*
+!bench/results/tier3a_story/*.json
+!bench/results/tier3a_story/*.jsonl
+!bench/results/tier3a_ab/
+bench/results/tier3a_ab/*
+!bench/results/tier3a_ab/*.jsonl
+!bench/results/tier3a_ab/judge/
+bench/results/tier3a_ab/judge/*
+!bench/results/tier3a_ab/judge/*.json
+!bench/results/om_control/
+bench/results/om_control/*
+!bench/results/om_control/*.json
+!bench/results/om_control/ours_matched/
+bench/results/om_control/ours_matched/*
+!bench/results/om_control/ours_matched/*.jsonl
 bench/_smoke/
 bench/logs/

@@ -51,7 +51,7 @@ SEEDS = [0, 1, 2]
 SHOTS = 5
 
 
-def story_prompts(brief: str, model: str, seed: int) -> list[str]:
+def story_prompts(brief: str, model: str, seed: int, shots: int | None = None) -> list[str]:
     """Our planner's per-shot prompts for one run of the orchestration.
 
     The full pipeline is driven once per story so the prompts are genuine
@@ -70,8 +70,9 @@ def story_prompts(brief: str, model: str, seed: int) -> list[str]:
     )
     reset_settings()
 
-    project = project_store.create_project(brief, "电影感短剧", SHOTS, genre="悬疑",
-                                           target_seconds=int(SHOTS * 5))
+    count = shots or SHOTS
+    project = project_store.create_project(brief, "电影感短剧", count, genre="悬疑",
+                                           target_seconds=int(count * 5))
     state = project_store.load_state(project["project_id"])
     state["status"] = "running"
     final = run_agent(state)

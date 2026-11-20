@@ -1,0 +1,173 @@
+{
+  "dimension": "aesthetic_quality",
+  "scores": {
+    "brief__cogvideox5b": 3.8,
+    "planned__cogvideox5b": 3.4,
+    "planned_short__cogvideox5b": 3.6,
+    "brief__wan21_1_3b": 3.8,
+    "planned__wan21_1_3b": 3.2,
+    "planned_short__wan21_1_3b": 3.0
+  },
+  "samples": {
+    "brief__cogvideox5b": [
+      4.0,
+      4.0,
+      3.0,
+      4.0,
+      4.0
+    ],
+    "planned__cogvideox5b": [
+      2.0,
+      4.0,
+      3.0,
+      3.0,
+      5.0
+    ],
+    "planned_short__cogvideox5b": [
+      3.0,
+      4.0,
+      4.0,
+      3.0,
+      4.0
+    ],
+    "brief__wan21_1_3b": [
+      4.0,
+      4.0,
+      3.0,
+      4.0,
+      4.0
+    ],
+    "planned__wan21_1_3b": [
+      3.0,
+      4.0,
+      3.0,
+      3.0,
+      3.0
+    ],
+    "planned_short__wan21_1_3b": [
+      3.0,
+      3.0,
+      3.0,
+      3.0,
+      3.0
+    ]
+  },
+  "models_covered": [
+    "brief__cogvideox5b",
+    "brief__wan21_1_3b",
+    "planned__cogvideox5b",
+    "planned__wan21_1_3b",
+    "planned_short__cogvideox5b",
+    "planned_short__wan21_1_3b"
+  ],
+  "per_video": {
+    "brief1|seed=0": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 2,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": " 4 ,because the video excels in structure, color use, and composition, offering a visually satisfying experience with good emotional expression and creativity. However, it does not quite reach the level of profound emotional expression or exceptional visual impact that would warrant a perfect score.",
+        "planned__cogvideox5b": ", because the frames are somewhat monotonous in color, the action is straightforward without significant artistic merit, and the overall visual appeal and emotional expression are limited. The cool-toned palette and lack of vibrant elements result in a subdued and less engaging aesthetic experience.",
+        "planned_short__cogvideox5b": "The absence of distracting elements contributes to the overall coherence of the video.\n\n### Final Score:\n- **video: 3**, because while the video has a clear and structured composition with appropriate color use, it lacks dynamic elements and visual variety, resulting in a moderate aesthetic quality.",
+        "brief__wan21_1_3b": "ng elements that disrupt the flow, and the scene maintains a sense of balance throughout.\n\n### Final Score:\n- video: 4 ,because the video demonstrates strong performance in color, composition, and clarity, offering a visually satisfying experience with reasonable emotional expression and creativity.",
+        "planned__wan21_1_3b": "aptures the action and maintains focus on the subject, it suffers from a monotonous color palette and repetitive frames, which limit its visual appeal and emotional impact. The overall composition and structure are adequate, but the lack of vibrancy and variety detract from achieving higher quality.",
+        "planned_short__wan21_1_3b": "ghtforward presentation is effective for its purpose but does not excel in creativity or visual impact.\n\n- **video: 3**, because the video maintains a clear and professional aesthetic with good color use and harmony, but it lacks dynamism and emotional depth, resulting in a moderate overall quality."
+      }
+    },
+    "brief1|seed=1": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 4,
+        "planned_short__cogvideox5b": 4,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 4,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "nd action without distracting from it, resulting in a balanced and well-integrated scene.\n\n### Final Score:\n- video: 4 ,because the video demonstrates strong performance in color, composition, and clarity, offering a visually satisfying experience with reasonable emotional expression and creativity.",
+        "planned__cogvideox5b": "ore:\n- **video: 4**, because the video excels in color use, composition, and visual appeal, offering a strong and cohesive aesthetic experience with a compelling emotional expression. However, it could benefit from more varied dynamics or additional elements to reach the highest level of excellence.",
+        "planned_short__cogvideox5b": "verall atmosphere is immersive, drawing the viewer into the scene.\n\n### Final Score:\n- video: 4 ,because the video excels in color use and visual appeal, with a strong composition and harmonious presentation, though it could benefit from more dynamic elements to enhance emotional expression further.",
+        "brief__wan21_1_3b": " Score:\n- video: 4 ,because the video excels in structure, color use, and composition, offering a visually satisfying experience with good clarity and emotional expression. However, it does not reach the level of profound emotional impact or exceptional creativity that would warrant a perfect score.",
+        "planned__wan21_1_3b": "use the video excels in color use and composition, creating a visually appealing and emotionally resonant scene. While the structure and harmony are strong, there is room for further enhancement in terms of introducing more varied elements or dynamics to elevate the experience to exceptional levels.",
+        "planned_short__wan21_1_3b": "ecause while the color use and composition are effective, the repetitive nature of the frames and the lack of dynamic movement or interaction reduce the overall visual appeal and harmony. The video provides a basic aesthetic experience but falls short in terms of creativity and emotional expression."
+      }
+    },
+    "brief1|seed=2": {
+      "scores": {
+        "brief__cogvideox5b": 3,
+        "planned__cogvideox5b": 3,
+        "planned_short__cogvideox5b": 4,
+        "brief__wan21_1_3b": 3,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "3**, because the video demonstrates a clear structure and composition with a balanced focus on the subject, but it suffers from a lack of vibrant color use and dynamic visual elements, resulting in a moderate visual appeal and emotional expression. The overall harmony is present but not exceptional.",
+        "planned__cogvideox5b": "ature and lack of dynamic elements limit its visual appeal and emotional expression.\n\n- **video: 3**, because the video shows a consistent and cohesive use of color and lighting, but it suffers from a lack of dynamic elements and interaction, leading to a somewhat monotonous and static presentation.",
+        "planned_short__cogvideox5b": "ue to its static nature and lack of dynamic elements. Based on the provided criteria, the video can be classified as having good quality.\n\n- **video: 4**, because the video excels in structure, color use, and harmony, but could benefit from more dynamic visual elements to enhance its overall appeal.",
+        "brief__wan21_1_3b": "ppeal and emotional expression are moderate. The harmony is present but not particularly striking.\n\n- **video: 3**, because the video has a clear and balanced structure with a neutral color palette, but it lacks vibrancy and dynamic elements that would elevate its visual appeal and emotional impact.",
+        "planned__wan21_1_3b": "ent, which can break the flow and disrupt the harmony.\n\n### Final Score:\n- **video: 3**, because the video demonstrates average performance in structure, color use, and harmony, but suffers from a lack of dynamic composition and visual appeal, resulting in a moderately engaging aesthetic experience.",
+        "planned_short__wan21_1_3b": "k together to convey a singular, calm, and introspective mood.\n\n### Final Score:\n- video: 3 ,because the video demonstrates a moderate level of aesthetic quality with effective use of color and composition, but it lacks dynamic elements and emotional depth, making it average rather than exceptional."
+      }
+    },
+    "brief1|seed=3": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 3,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "ene. There are no jarring elements or inconsistencies that disrupt the flow of the video.\n\n### Final Score:\n- video: 4 ,because the video demonstrates strong performance in color, composition, and clarity, offering a visually satisfying experience with reasonable emotional expression and creativity.",
+        "planned__cogvideox5b": " overall coherence.\n\n### Final Score:\n- **Video: 3**, because while the video has a clear structure and effective composition, it suffers from a lack of vibrant colors and dynamic visual elements, which limits its overall aesthetic appeal. The harmony is maintained, but the visual impact is average.",
+        "planned_short__cogvideox5b": "erall appeal. The video is functional and clear but does not excel in any particular aspect.\n\n- **video: 3**, because the video has a clear structure and effective use of color contrast, but it lacks dynamic elements and emotional expression, resulting in a moderately appealing aesthetic experience.",
+        "brief__wan21_1_3b": "ence. There are no abrupt changes or jarring elements that disrupt the flow of the video.\n\n### Final Score:\n- video: 4 ,because the video demonstrates strong performance in color, composition, and clarity, offering a visually satisfying experience with reasonable emotional expression and creativity.",
+        "planned__wan21_1_3b": "video: 3**, because while the video demonstrates a reasonable structure and appropriate color use, it suffers from a lack of dynamic composition and visual appeal. The repetitive nature of the frames and the muted color palette limit the overall aesthetic quality, resulting in a moderate evaluation.",
+        "planned_short__wan21_1_3b": "e than it could be.\n\n### Final Score:\n- **video: 3**, because while the video demonstrates some strengths in structure and color use, particularly with the high-visibility vest, it suffers from a lack of dynamic composition and visual variety, resulting in a moderately engaging aesthetic experience."
+      }
+    },
+    "brief1|seed=4": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 5,
+        "planned_short__cogvideox5b": 4,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "duals suggest a deliberate and purposeful context, further enhancing the overall harmony.\n\n### Final Score:\n- video: 4 ,because the video demonstrates strong performance in color, composition, and clarity, offering a visually satisfying experience with reasonable emotional expression and creativity.",
+        "planned__cogvideox5b": "l harmony is excellent. Therefore, the video deserves a high score.\n\n- **video: 5**, because the video excels in all aspects, with high standards in color, composition, and clarity, delivering a strong visual impact and profound emotional expression, resulting in an outstanding aesthetic experience.",
+        "planned_short__cogvideox5b": "focused, the visual appeal is engaging, and the video maintains a cohesive and harmonious feel throughout.\n\n- **video: 4**, because the video excels in color use, visual appeal, and harmony, offering a visually satisfying experience with a strong emotional expression through the dynamic neon lights.",
+        "brief__wan21_1_3b": ", because the video excels in structure, color use, and composition, offering a visually satisfying experience with clear emotional expression and a strong sense of harmony. However, it does not push the boundaries of creativity or emotional depth, which slightly limits its potential for excellence.",
+        "planned__wan21_1_3b": "e of the frames and the lack of variety in the scenes slightly diminish the overall visual appeal and harmony.\n\n- **video: 3**, because the video has a consistent and appropriate color scheme and composition, but the repetitive frames and lack of variety reduce its overall visual appeal and harmony.",
+        "planned_short__wan21_1_3b": "y and limited variation in composition and structure result in a balanced but not exceptionally engaging experience.\n\n- **video: 3**, because the video effectively uses neon lighting to create visual interest but lacks complexity in structure and composition, leading to a moderate aesthetic quality."
+      }
+    }
+  },
+  "groups_scored": 5,
+  "groups_expected": 5,
+  "usage": {
+    "prompt_tokens": 324470,
+    "completion_tokens": 18689,
+    "calls": 60
+  },
+  "elapsed_s": 561.9,
+  "error": "",
+  "judge": {
+    "model": "qwen2.5-vl-32b-local",
+    "base_url": "http://127.0.0.1:8791/v1"
+  }
+}

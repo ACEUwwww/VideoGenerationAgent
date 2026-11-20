@@ -1,0 +1,173 @@
+{
+  "dimension": "imaging_quality",
+  "scores": {
+    "brief__cogvideox5b": 4.4,
+    "planned__cogvideox5b": 3.2,
+    "planned_short__cogvideox5b": 3.6,
+    "brief__wan21_1_3b": 4.2,
+    "planned__wan21_1_3b": 3.0,
+    "planned_short__wan21_1_3b": 3.4
+  },
+  "samples": {
+    "brief__cogvideox5b": [
+      5.0,
+      5.0,
+      5.0,
+      4.0,
+      3.0
+    ],
+    "planned__cogvideox5b": [
+      2.0,
+      4.0,
+      3.0,
+      3.0,
+      4.0
+    ],
+    "planned_short__cogvideox5b": [
+      5.0,
+      4.0,
+      3.0,
+      3.0,
+      3.0
+    ],
+    "brief__wan21_1_3b": [
+      5.0,
+      5.0,
+      4.0,
+      4.0,
+      3.0
+    ],
+    "planned__wan21_1_3b": [
+      2.0,
+      3.0,
+      3.0,
+      4.0,
+      3.0
+    ],
+    "planned_short__wan21_1_3b": [
+      4.0,
+      4.0,
+      3.0,
+      3.0,
+      3.0
+    ]
+  },
+  "models_covered": [
+    "brief__cogvideox5b",
+    "brief__wan21_1_3b",
+    "planned__cogvideox5b",
+    "planned__wan21_1_3b",
+    "planned_short__cogvideox5b",
+    "planned_short__wan21_1_3b"
+  ],
+  "per_video": {
+    "brief1|seed=0": {
+      "scores": {
+        "brief__cogvideox5b": 5,
+        "planned__cogvideox5b": 2,
+        "planned_short__cogvideox5b": 5,
+        "brief__wan21_1_3b": 5,
+        "planned__wan21_1_3b": 2,
+        "planned_short__wan21_1_3b": 4
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": " and appropriate brightness levels. The frames are sharp, detailed, and free from distortions, contributing to an overall excellent viewing experience.\n\n- **video: 5**, because the frames exhibit high clarity, minimal noise, and well-balanced brightness, resulting in an excellent viewing experience.",
+        "planned__cogvideox5b": "ng contributes to the difficulty in distinguishing details, further impacting the viewing experience negatively.\n\n### Final Score:\n- **Video: 2**, because the frames are heavily blurred, contain noticeable noise, and suffer from uneven brightness, leading to an unnatural and poor viewing experience.",
+        "planned_short__cogvideox5b": "n criteria, the video demonstrates high clarity, minimal noise, and balanced brightness. These factors collectively indicate a high-quality video.\n\n- **video: 5**, because the frames exhibit excellent clarity, minimal noise, and appropriate brightness, resulting in an exceptional viewing experience.",
+        "brief__wan21_1_3b": "with the characteristics of excellent quality. Comparisons with other models further support this assessment, as the video maintains consistent high standards across all frames.\n\n- video: 5 ,because the frames are clear, free of noise, and have well-balanced brightness, indicating excellent quality.",
+        "planned__wan21_1_3b": "because the frames exhibit heavy motion blur, making the subject and environment appear distorted and unclear, leading to an unnatural viewing experience. The consistent blurriness across all frames suggests a significant issue with capturing stable imagery, impacting the overall quality negatively.",
+        "planned_short__wan21_1_3b": "quality visual experience.\n\n- **video: 4**, because the frames exhibit high clarity, minimal noise, and well-balanced brightness, contributing to a good viewing experience. However, there is a slight lack of dynamic range or variation in the frames, which prevents it from reaching the highest score."
+      }
+    },
+    "brief1|seed=1": {
+      "scores": {
+        "brief__cogvideox5b": 5,
+        "planned__cogvideox5b": 4,
+        "planned_short__cogvideox5b": 4,
+        "brief__wan21_1_3b": 5,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 4
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "uation criteria, the video demonstrates excellent clarity, minimal noise, and balanced brightness. These factors collectively indicate a high-quality video.\n\n- **video: 5**, because the frames are clear, free from noise, and have well-managed brightness, resulting in an excellent viewing experience.",
+        "planned__cogvideox5b": " to the realism without washing out any details.\n\n### Final Score:\n- video: 4 ,because the video demonstrates high clarity, minimal noise, and well-balanced brightness, providing a good viewing experience. However, it does not reach the level of perfection required for an \"Excellent Quality\" rating.",
+        "planned_short__cogvideox5b": "criteria, the video demonstrates high clarity, minimal noise, and appropriate brightness levels. These factors contribute to an overall good viewing experience.\n\n- **video: 4**, because the video exhibits high clarity, minimal noise, and well-balanced brightness, providing a good viewing experience.",
+        "brief__wan21_1_3b": "eria, the video demonstrates excellent clarity, minimal noise, and balanced brightness. These factors contribute to a highly satisfactory viewing experience.\n\n- **video: 5**, because the frames are clear, free of noise, and have well-balanced brightness, resulting in an excellent viewing experience.",
+        "planned__wan21_1_3b": "chieve higher definition, the current quality is sufficient for a pleasant viewing experience. Therefore, the video scores as follows:\n\n- **video: 3**, because the clarity meets standard definition with minor distortions, some noise spots, and slight overexposure, resulting in an average experience.",
+        "planned_short__wan21_1_3b": "s strong, and the lighting effectively highlights the person in the raincoat.\n\n- **video: 4**, because the clarity is high, with minimal blurring and good focus on the subject, although there is some digital noise in the darker areas and the background could be brighter for better detail visibility."
+      }
+    },
+    "brief1|seed=2": {
+      "scores": {
+        "brief__cogvideox5b": 5,
+        "planned__cogvideox5b": 3,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "and well-balanced brightness. The overall image quality is high, making it suitable for a professional or high-definition viewing experience.\n\n- **video: 5**, because the frames exhibit excellent clarity, minimal noise, and well-balanced brightness, contributing to a high-quality viewing experience.",
+        "planned__cogvideox5b": "rightness, the video quality falls into the \"Moderate Quality\" category. It is better than the poorest quality but does not meet the standards of high definition.\n\n- video: 3 ,because the clarity is moderate, there is some noise, and the brightness is low, resulting in an average viewing experience.",
+        "planned_short__cogvideox5b": "lity is not exceptional but is also not severely compromised. Therefore, the video can be classified as having moderate quality.\n\n- **video: 3**, because the clarity is adequate but not high-definition, there is some noise present, and the brightness is low, indicating a moderate viewing experience.",
+        "brief__wan21_1_3b": "aluation criteria, the video demonstrates good clarity, minimal noise, and balanced brightness. These factors collectively indicate a high-quality visual experience.\n\n- **video: 4**, because the frames show high clarity, minimal noise, and appropriate brightness, providing a good viewing experience.",
+        "planned__wan21_1_3b": "ality\" category. It does not meet the criteria for high definition due to the lack of sharpness and presence of noise, but it is not severely distorted or blurry.\n\n- video: 3 ,because the clarity is moderate, there is some noise, and the brightness is low, resulting in an average viewing experience.",
+        "planned_short__wan21_1_3b": "-definition sharpness and the noticeable noise detract from the overall quality, but the scene is still discernible without significant distortion.\n\n- video: 3 ,because the clarity is moderate, there is some noise present, and the brightness is low, indicating a generally average viewing experience."
+      }
+    },
+    "brief1|seed=3": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 3,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 4,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "inimal noise, and appropriate brightness. The frames are sharp, and the subject is clearly visible with smooth motion, indicating a high-quality video.\n\n- **video: 4**, because the video exhibits high-definition clarity, minimal noise, and appropriate brightness, providing a good viewing experience.",
+        "planned__cogvideox5b": "ering the moderate clarity, presence of noise, and balanced but somewhat uneven brightness, the video quality falls into the \"Moderate Quality\" category.\n\n- **video: 3**, because the clarity is adequate but not sharp, there is some noise present, and the brightness is balanced but could be improved.",
+        "planned_short__cogvideox5b": " the content is discernible, the lack of sharpness, presence of noise, and slightly dim lighting detract from the overall quality.\n\n- **video: 3**, because the clarity is moderate, there is noticeable noise, and the brightness is adequate but slightly dim, resulting in an average viewing experience.",
+        "brief__wan21_1_3b": "ion criteria, the video demonstrates good clarity, minimal noise, and appropriate brightness. There are no significant issues that detract from the viewing experience.\n\n- **video: 4**, because the video has high clarity, minimal noise, and appropriate brightness, providing a good viewing experience.",
+        "planned__wan21_1_3b": "video quality.\n\n### Final Score:\n- **video: 4**, because the video maintains good clarity and minimal noise throughout most of the sequence, with only a slight drop in clarity during the transition to a darker area. The brightness is appropriately managed, ensuring a good viewing experience overall.",
+        "planned_short__wan21_1_3b": " combination of these factors. While the video is watchable, it lacks the crispness and detail that would elevate it to a higher quality rating.\n\n- video: 3 ,because the clarity is moderate, there is some noise, and the brightness is slightly underexposed, resulting in an average viewing experience."
+      }
+    },
+    "brief1|seed=4": {
+      "scores": {
+        "brief__cogvideox5b": 3,
+        "planned__cogvideox5b": 4,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 3,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "brief__cogvideox5b": "\n\nGiven these observations, the video quality leans towards being average due to the moderate clarity but is otherwise free from major distortions or noise issues.\n\n- video: 3 ,because the clarity is moderate with some lack of sharpness, but noise is minimal and brightness is appropriately balanced.",
+        "planned__cogvideox5b": "g faster movements. The overall impression is that the video is clear enough to follow the action and understand the context, with minimal noise and appropriate brightness.\n\n- **video: 4**, because the video has good clarity and balanced brightness, with only minor motion blur affecting the quality.",
+        "planned_short__cogvideox5b": "the video quality leans towards being moderate due to the lack of sharpness and the uneven brightness, despite the absence of significant noise.\n\n- video: 3 ,because the clarity is moderate with some lack of sharpness, the noise is low, and the brightness is uneven but balanced without overexposure.",
+        "brief__wan21_1_3b": "ll-balanced.\n\nGiven these observations, the video quality leans towards being average due to the moderate clarity but is otherwise free from major issues like noise or overexposure.\n\n- video: 3 ,because the clarity is moderate with some lack of sharpness, while noise and brightness are well-managed.",
+        "planned__wan21_1_3b": " falls into the \"Moderate Quality\" category, as it has some distortions, noise, and issues with exposure that affect the viewing experience.\n\n- video: 3 ,because the clarity is moderate with motion blur, there is noticeable noise, and the brightness is uneven with overexposed and underexposed areas.",
+        "planned_short__wan21_1_3b": "ker areas, and while the brightness is intentionally uneven, it does not result in overexposure. The noise levels are low, contributing to a reasonably clean image quality. Overall, the video provides an average viewing experience due to its intentional stylistic choices rather than technical flaws."
+      }
+    }
+  },
+  "groups_scored": 5,
+  "groups_expected": 5,
+  "usage": {
+    "prompt_tokens": 160390,
+    "completion_tokens": 7241,
+    "calls": 30
+  },
+  "elapsed_s": 387.8,
+  "error": "",
+  "judge": {
+    "model": "qwen2.5-vl-32b-local",
+    "base_url": "http://127.0.0.1:8791/v1"
+  }
+}

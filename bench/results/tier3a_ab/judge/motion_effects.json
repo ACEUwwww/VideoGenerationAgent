@@ -1,0 +1,148 @@
+{
+  "dimension": "motion_effects",
+  "scores": {
+    "brief__cogvideox5b": 3.8,
+    "planned__cogvideox5b": 3.8,
+    "planned_short__cogvideox5b": 3.4,
+    "brief__wan21_1_3b": 3.8,
+    "planned__wan21_1_3b": 4.0,
+    "planned_short__wan21_1_3b": 3.4
+  },
+  "samples": {
+    "brief__cogvideox5b": [
+      3.0,
+      4.0,
+      4.0,
+      4.0,
+      4.0
+    ],
+    "planned__cogvideox5b": [
+      5.0,
+      3.0,
+      4.0,
+      4.0,
+      3.0
+    ],
+    "planned_short__cogvideox5b": [
+      3.0,
+      3.0,
+      4.0,
+      3.0,
+      4.0
+    ],
+    "brief__wan21_1_3b": [
+      3.0,
+      4.0,
+      4.0,
+      4.0,
+      4.0
+    ],
+    "planned__wan21_1_3b": [
+      5.0,
+      3.0,
+      4.0,
+      4.0,
+      4.0
+    ],
+    "planned_short__wan21_1_3b": [
+      3.0,
+      3.0,
+      4.0,
+      3.0,
+      4.0
+    ]
+  },
+  "models_covered": [
+    "brief__cogvideox5b",
+    "brief__wan21_1_3b",
+    "planned__cogvideox5b",
+    "planned__wan21_1_3b",
+    "planned_short__cogvideox5b",
+    "planned_short__wan21_1_3b"
+  ],
+  "per_video": {
+    "brief1|seed=0": {
+      "scores": {
+        "brief__cogvideox5b": 3,
+        "planned__cogvideox5b": 5,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 3,
+        "planned__wan21_1_3b": 5,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "all": "istic, with effective use of dynamic blur, coherent object-background interaction, and dynamic shadows and lighting.\n- **planned_short__wan21_1_3b**: 3 , because the lack of significant motion limits the evaluation of dynamic effects, although the stability and consistency of the scene are adequate."
+      }
+    },
+    "brief1|seed=1": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 3,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 3,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "all": "es the perceived dynamism.\n- **planned__wan21_1_3b**: 3 , because the video lacks motion, so it cannot be evaluated fully on motion effects. However, the still posture is natural.\n- **planned_short__wan21_1_3b**: 3 , because the lack of motion limits the evaluation, but the still posture is natural."
+      }
+    },
+    "brief1|seed=2": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 4,
+        "planned_short__cogvideox5b": 4,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 4,
+        "planned_short__wan21_1_3b": 4
+      },
+      "error": "",
+      "raw": {
+        "all": "ic blur is appropriate, but overall dynamism could be enhanced slightly.\n- **planned_short__wan21_1_3b**: 4 , because the motion is natural and consistent, with good handling of shadows and lighting. Minimal dynamic blur is appropriate, but slight enhancement could make the motion feel more dynamic."
+      }
+    },
+    "brief1|seed=3": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 4,
+        "planned_short__cogvideox5b": 3,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 4,
+        "planned_short__wan21_1_3b": 3
+      },
+      "error": "",
+      "raw": {
+        "all": "anned__wan21_1_3b**: 4 , because the motion is coherent and realistic, with good handling of shadows and lighting, but the dynamic blur could be slightly enhanced.\n- **planned_short__wan21_1_3b**: 3 , because the lack of significant motion limits the evaluation, but the stationary pose is realistic."
+      }
+    },
+    "brief1|seed=4": {
+      "scores": {
+        "brief__cogvideox5b": 4,
+        "planned__cogvideox5b": 3,
+        "planned_short__cogvideox5b": 4,
+        "brief__wan21_1_3b": 4,
+        "planned__wan21_1_3b": 4,
+        "planned_short__wan21_1_3b": 4
+      },
+      "error": "",
+      "raw": {
+        "all": ", because the motion is more natural and consistent, with better application of dynamic blur and improved interaction with the background.\n- **planned_short__wan21_1_3b**: 4 , because the transitions are smooth and visually appealing, maintaining coherence despite the abstract nature of the content."
+      }
+    }
+  },
+  "groups_scored": 5,
+  "groups_expected": 5,
+  "usage": {
+    "prompt_tokens": 478225,
+    "completion_tokens": 25931,
+    "calls": 70
+  },
+  "elapsed_s": 264.9,
+  "error": "",
+  "judge": {
+    "model": "qwen2.5-vl-32b-local",
+    "base_url": "http://127.0.0.1:8791/v1"
+  }
+}

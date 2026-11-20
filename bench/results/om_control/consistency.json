@@ -1,0 +1,20 @@
+[
+  {
+    "score": 3.0,
+    "changed": "Face and Facial Features",
+    "why": "The face and facial features are inconsistent across the frames, with some showing a person wearing glasses and others not, indicating changes in appearance.",
+    "raw": "**SCORE:** 3  \n**CHANGED:** Face and Facial Features  \n**WHY:** The face and facial features are inconsistent across the frames, with some showing a person wearing glasses and others not, indicating changes in appearance.",
+    "label": "openmontage:omfix",
+    "shots": 12,
+    "elapsed_s": 3.9
+  },
+  {
+    "score": 4.0,
+    "changed": "Clothing",
+    "why": "The main character's face, hairstyle, and body build remain consistent across most frames, but there is a noticeable change in clothing in Shot 4, where the character wears a different outfit.",
+    "raw": "**SCORE:** 4  \n**CHANGED:** Clothing  \n**WHY:** The main character's face, hairstyle, and body build remain consistent across most frames, but there is a noticeable change in clothing in Shot 4, where the character wears a different outfit.",
+    "label": "ours:project_b3a0cd04",
+    "shots": 5,
+    "elapsed_s": 3.3
+  }
+]
