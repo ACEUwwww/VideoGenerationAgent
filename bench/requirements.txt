@@ -4,6 +4,9 @@ openai>=2.0
 opencv-python-headless>=4.10
 python-dotenv>=1.0.1
 tenacity>=8.0
+# Face-identity cross-check: MTCNN + InceptionResnetV1/VGGFace2. Pure Python;
+# uses the host torch build, so it adds no CUDA dependency of its own.
+facenet-pytorch>=2.6
 # Open-source baselines. torch is expected from the host image (CUDA build);
 # the bench venv is created with --system-site-packages so it is not reinstalled.
 diffusers==0.42.1

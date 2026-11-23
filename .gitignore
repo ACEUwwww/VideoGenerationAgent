@@ -37,6 +37,9 @@ bench/results/*
 # Evidence for the control arm: which claims are measured and which are still
 # open. Small text, and the report cites it directly.
 !bench/results/om_control_notes.md
+# Pixel-side cross-check of the consistency claim: a feasibility result, so the
+# write-up is versioned while the frames it describes stay local.
+!bench/results/identity_crosscheck.md
 # The paper-level write-up: workflow, experiments, figures, and the
 # mechanism analysis against the reference workflow.
 !bench/results/orchestration_report.md
