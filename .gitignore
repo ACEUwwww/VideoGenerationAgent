@@ -40,6 +40,9 @@ bench/results/*
 # Pixel-side cross-check of the consistency claim: a feasibility result, so the
 # write-up is versioned while the frames it describes stay local.
 !bench/results/identity_crosscheck.md
+# Workflow comparison against OpenMontage and DreamFactory. Documentation only:
+# it cites code that is in the tree and a paper, so there is media to exclude.
+!bench/results/workflow_comparison.md
 # The paper-level write-up: workflow, experiments, figures, and the
 # mechanism analysis against the reference workflow.
 !bench/results/orchestration_report.md
