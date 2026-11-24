@@ -71,6 +71,19 @@ def load() -> list[dict]:
     return rows
 
 
+def load_noise_floor() -> float | None:
+    """How much the judge moves on an unchanged prompt, from the repeat study.
+
+    A contrast smaller than this is not evidence of anything, so it is loaded
+    and printed next to every contrast rather than left in another document.
+    """
+    path = ROOT / "bench/results/noise_floor.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return (data.get("independent") or {}).get("mean_range")
+
+
 def sign_test(diffs: list[float]) -> tuple[int, int, int, float]:
     wins = sum(1 for d in diffs if d > 0)
     losses = sum(1 for d in diffs if d < 0)
@@ -113,6 +126,10 @@ def main() -> int:
         cells.setdefault((row["model"], row["brief_index"], row["repeat"]), {})[row["arm"]] = row["score"]
         chars.setdefault(row["arm"], []).extend(row.get("prompt_chars") or [])
 
+    repeats = len({key[2] for key in cells})
+    noise = load_noise_floor()
+    print(f"cells={len(cells)} repeats={repeats} noise_floor={noise}")
+
     arms = sorted({row["arm"] for row in rows})
     print("arm means (1-5, higher is better)")
     for arm in arms:
@@ -135,13 +152,25 @@ def main() -> int:
             continue
         wins, ties, losses, p = sign_test(diffs)
         lo, hi = bootstrap_ci(diffs)
+        mean_diff = round(statistics.mean(diffs), 3)
+        verdict = ""
+        if noise is not None:
+            verdict = ("below noise floor — not evidence"
+                       if abs(mean_diff) < noise else "above noise floor")
         results[f"{better}-{worse}"] = {
             "question": question, "n": len(diffs),
-            "mean_diff": round(statistics.mean(diffs), 3),
+            "mean_diff": mean_diff,
             "ci95": [lo, hi], "wins": wins, "ties": ties, "losses": losses, "p": p,
+            "noise_floor": noise, "verdict": verdict,
         }
-        print(f"  {better} - {worse}: {statistics.mean(diffs):+.3f} "
-              f"CI95=[{lo:+}, {hi:+}] w/t/l={wins}/{ties}/{losses} p={p}  ({question})")
+        print(f"  {better} - {worse}: {mean_diff:+.3f} "
+              f"CI95=[{lo:+}, {hi:+}] w/t/l={wins}/{ties}/{losses} p={p}  "
+              f"({question}) {verdict}")
+
+    if repeats < 2:
+        print("\nWARNING: one repeat per cell. The judge moves "
+              f"~{noise} points on an unchanged prompt (bench/results/noise_floor.json),"
+              " so these contrasts cannot separate arm effect from render noise.")
 
     out = ROOT / "bench/results/prompt_ablation/summary.json"
     out.write_text(json.dumps({"arms": arms, "contrasts": results}, indent=2), encoding="utf-8")
