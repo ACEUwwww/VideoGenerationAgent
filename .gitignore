@@ -48,6 +48,7 @@ bench/results/*
 # The paper-level write-up: workflow, experiments, figures, and the
 # mechanism analysis against the reference workflow.
 !bench/results/orchestration_report.md
+!bench/results/technical_report.md
 # Text evidence behind the figures: judge verdicts and render records only.
 # The media they describe is tens of MB of renders and stays local.
 !bench/results/tier3a_story/
