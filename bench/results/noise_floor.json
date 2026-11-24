@@ -1,0 +1,14 @@
+{
+  "independent": {
+    "cells": 6,
+    "mean_range": 1.0,
+    "max_range": 2.0,
+    "mean_sd": 0.58
+  },
+  "planned": {
+    "cells": 6,
+    "mean_range": 0.83,
+    "max_range": 1.0,
+    "mean_sd": 0.48
+  }
+}
