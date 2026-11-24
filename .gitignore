@@ -43,6 +43,8 @@ bench/results/*
 # Workflow comparison against OpenMontage and DreamFactory. Documentation only:
 # it cites code that is in the tree and a paper, so there is media to exclude.
 !bench/results/workflow_comparison.md
+# Scoring spec: every formula quoted here must stay in step with metrics.py.
+!bench/results/scoring_rules.md
 # The paper-level write-up: workflow, experiments, figures, and the
 # mechanism analysis against the reference workflow.
 !bench/results/orchestration_report.md
