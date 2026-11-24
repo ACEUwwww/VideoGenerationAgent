@@ -85,6 +85,15 @@ def load_noise_floor() -> float | None:
 
 
 def sign_test(diffs: list[float]) -> tuple[int, int, int, float]:
+    """One-sided sign test in the direction the hypothesis predicts.
+
+    ``diffs`` is defined as ``better - worse``, so a positive difference is the
+    predicted direction and the tail is P(X >= wins). The earlier version of
+    this file reported P(X >= wins) while the contrast was written as
+    ``better - worse`` in a way that produced negative means — the same
+    wrong-sided tail bug the repeated-measure report had already corrected. The
+    direction is now asserted here instead of assumed at the call site.
+    """
     wins = sum(1 for d in diffs if d > 0)
     losses = sum(1 for d in diffs if d < 0)
     n = wins + losses
@@ -153,6 +162,13 @@ def main() -> int:
         wins, ties, losses, p = sign_test(diffs)
         lo, hi = bootstrap_ci(diffs)
         mean_diff = round(statistics.mean(diffs), 3)
+        # The tail above is one-sided in the predicted direction. When the
+        # difference runs the other way it returns a p near 1, which reads as
+        # "no result" while the opposite effect may be the real finding. Report
+        # that tail too, so a reversed effect cannot hide behind a p of 1.
+        reversed_p = sign_test([-d for d in diffs])[3] if mean_diff < 0 else None
+        effect_p = reversed_p if reversed_p is not None else p
+        direction = "as predicted" if mean_diff > 0 else ("reversed" if mean_diff < 0 else "none")
         verdict = ""
         if noise is not None:
             verdict = ("below noise floor — not evidence"
@@ -160,11 +176,14 @@ def main() -> int:
         results[f"{better}-{worse}"] = {
             "question": question, "n": len(diffs),
             "mean_diff": mean_diff,
-            "ci95": [lo, hi], "wins": wins, "ties": ties, "losses": losses, "p": p,
+            "ci95": [lo, hi], "wins": wins, "ties": ties, "losses": losses,
+            "p_predicted_direction": p, "p_reversed": reversed_p,
+            "p_effect": effect_p, "direction": direction,
             "noise_floor": noise, "verdict": verdict,
         }
+        extra = f" p_effect={effect_p} ({direction})" if reversed_p is not None else ""
         print(f"  {better} - {worse}: {mean_diff:+.3f} "
-              f"CI95=[{lo:+}, {hi:+}] w/t/l={wins}/{ties}/{losses} p={p}  "
+              f"CI95=[{lo:+}, {hi:+}] w/t/l={wins}/{ties}/{losses} p={p}{extra}  "
               f"({question}) {verdict}")
 
     if repeats < 2:
