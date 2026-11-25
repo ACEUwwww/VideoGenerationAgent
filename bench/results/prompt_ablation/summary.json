@@ -3,6 +3,7 @@
     "brief_en",
     "brief_en_anchor",
     "planned",
+    "planned_padded",
     "planned_trunc",
     "scene"
   ],
@@ -62,7 +63,7 @@
       "verdict": "paired CI excludes zero"
     },
     "planned-planned_trunc": {
-      "question": "prompt length",
+      "question": "anchor effect, via truncation (not length)",
       "n": 18,
       "mean_diff": 1.278,
       "ci95": [
@@ -78,6 +79,24 @@
       "direction": "as predicted",
       "single_observation_noise_range": 1.0,
       "verdict": "paired CI excludes zero"
+    },
+    "planned-planned_padded": {
+      "question": "prompt length, anchor and scene held constant",
+      "n": 18,
+      "mean_diff": 0.056,
+      "ci95": [
+        -0.278,
+        0.389
+      ],
+      "wins": 5,
+      "ties": 0,
+      "losses": 4,
+      "p_predicted_direction": 0.5,
+      "p_reversed": null,
+      "p_effect": 0.5,
+      "direction": "as predicted",
+      "single_observation_noise_range": 1.0,
+      "verdict": "paired CI includes zero"
     }
   }
 }

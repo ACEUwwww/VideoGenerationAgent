@@ -36,7 +36,8 @@ lighting / action) and **A** (character appearance), then reassembled:
 | `brief_en_anchor` | brief + A | anchor, no plan structure |
 | `scene` | S only | plan content, no anchor |
 | `planned` | S + A (the planner's own text) | the original `planned` arm |
-| `planned_trunc` | first 45 % of `planned` | *intended* as length control |
+| `planned_trunc` | first 45 % of `planned` | *intended* as length control — it is not one |
+| `planned_padded` | `planned` + neutral production vocabulary to ~2× | length, anchor and scene held constant |
 
 Two corrections were made before running, both documented in the commit log:
 
@@ -65,6 +66,7 @@ Arm means (1–5, higher is better; n = 18 cells each):
 | `scene` | 3.50 | 0.71 | 570 |
 | `planned_trunc` | 3.00 | 0.91 | 330 |
 | `planned` | 4.28 | 0.67 | 863 |
+| `planned_padded` | 4.22 | 1.00 | 1695 |
 | `brief_en_anchor` | 4.56 | 0.86 | 461 |
 
 Paired contrasts (within model/brief/repeat, n = 18 pairs; CI is a 5 000-sample
@@ -76,6 +78,7 @@ bootstrap, p is the exact one-sided sign test):
 | `scene − planned` | −0.78 | [−1.11, −0.44] | 1/0/13 | 0.0009 | **CI excludes zero** |
 | `brief_en − brief_en_anchor` | −1.39 | [−2.00, −0.78] | 1/0/13 | 0.0009 | **CI excludes zero** |
 | `planned − planned_trunc` | +1.28 | [+0.72, +1.83] | 12/0/1 | 0.0017 | **CI excludes zero** |
+| `planned − planned_padded` | +0.06 | [−0.28, +0.39] | 5/0/4 | 0.50 | CI includes zero |
 
 Negative signs on the anchor rows mean the **anchor arm scores higher** — the
 contrast is written `arm_a − arm_b`, so a negative value is the anchor winning.
@@ -102,7 +105,12 @@ is a factorial result, not a chain of comparisons.
 detailed scene description without the character anchor does not make the person
 more consistent, which is what the earlier comparison could not separate.
 
-## A caveat that invalidates the length arm
+**Prompt length shows no measurable effect.** `planned` → `planned_padded` is
++0.06 with a CI spanning zero, at a 1.95× length ratio with the anchor and scene
+held byte-identical. The three results together say the carried state works
+because of *what it names*, not because of *how much it says*.
+
+## A caveat that invalidates the first length arm
 
 `planned_trunc` does **not** control for length. Measured after the fact:
 
@@ -116,11 +124,28 @@ because the planner writes scene first and appearance second. So the
 contrast, and its agreement with the other two is expected rather than
 independent.
 
-Consequently: **this study says nothing about prompt length.** The earlier
-observation that trimming a planned prompt to 400 characters recovers only ~0.075
-of the deficit remains the only length evidence, and it was not a controlled arm.
-A real length control would need to cut the scene sentences while keeping the
-anchor, or pad a short arm with scene-neutral filler to the anchor arm's length.
+`planned_padded` was built to replace it. It appends only production vocabulary —
+lens, depth of field, grain, light wrapping, colour grade — until the prompt is
+about twice as long, so the anchor and the scene text are byte-identical to
+`planned` and only length moves. Measured ratio: **1.94–1.95×**. A unit test
+asserts the appended text contains no appearance vocabulary and that `planned`
+appears as a prefix.
+
+**Length has no effect on this metric:**
+
+```
+planned (863 chars)   4.28   ─┐
+                              ├─ +0.06, CI [−0.28, +0.39], 5/0/4 wins, p = 0.50
+planned_padded (1695) 4.22   ─┘
+```
+
+That closes the question the earlier comparison left open: the gain from carried
+state is **not** a gain from writing more words. Doubling the prompt with
+detail-free production vocabulary moves nothing, while adding ~450 characters of
+appearance anchor moves the score by 0.8–1.4. Note also that `planned_padded`
+(1695 chars) scores slightly **below** `planned` (863), so if anything there is a
+weak hint of diminishing returns past a point — not evidence, but worth not
+reading as "more is better".
 
 ## What it does not establish
 
