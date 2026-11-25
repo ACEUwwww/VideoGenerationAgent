@@ -1,0 +1,83 @@
+{
+  "arms": [
+    "brief_en",
+    "brief_en_anchor",
+    "planned",
+    "planned_trunc",
+    "scene"
+  ],
+  "contrasts": {
+    "brief_en-scene": {
+      "question": "plan content, anchor absent",
+      "n": 18,
+      "mean_diff": -0.333,
+      "ci95": [
+        -0.889,
+        0.222
+      ],
+      "wins": 5,
+      "ties": 0,
+      "losses": 9,
+      "p_predicted_direction": 0.910217,
+      "p_reversed": 0.211975,
+      "p_effect": 0.211975,
+      "direction": "reversed",
+      "single_observation_noise_range": 1.0,
+      "verdict": "paired CI includes zero"
+    },
+    "scene-planned": {
+      "question": "anchor effect, scene content present",
+      "n": 18,
+      "mean_diff": -0.778,
+      "ci95": [
+        -1.111,
+        -0.444
+      ],
+      "wins": 1,
+      "ties": 0,
+      "losses": 13,
+      "p_predicted_direction": 0.999939,
+      "p_reversed": 0.000916,
+      "p_effect": 0.000916,
+      "direction": "reversed",
+      "single_observation_noise_range": 1.0,
+      "verdict": "paired CI excludes zero"
+    },
+    "brief_en-brief_en_anchor": {
+      "question": "anchor effect, scene content absent",
+      "n": 18,
+      "mean_diff": -1.389,
+      "ci95": [
+        -2.0,
+        -0.778
+      ],
+      "wins": 1,
+      "ties": 0,
+      "losses": 13,
+      "p_predicted_direction": 0.999939,
+      "p_reversed": 0.000916,
+      "p_effect": 0.000916,
+      "direction": "reversed",
+      "single_observation_noise_range": 1.0,
+      "verdict": "paired CI excludes zero"
+    },
+    "planned-planned_trunc": {
+      "question": "prompt length",
+      "n": 18,
+      "mean_diff": 1.278,
+      "ci95": [
+        0.722,
+        1.833
+      ],
+      "wins": 12,
+      "ties": 0,
+      "losses": 1,
+      "p_predicted_direction": 0.001709,
+      "p_reversed": null,
+      "p_effect": 0.001709,
+      "direction": "as predicted",
+      "single_observation_noise_range": 1.0,
+      "verdict": "paired CI excludes zero"
+    }
+  }
+}

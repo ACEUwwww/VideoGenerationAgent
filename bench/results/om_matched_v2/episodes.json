@@ -1,0 +1,143 @@
+[
+  {
+    "brief": "深夜的便利店，一个外卖骑手发现收银员不是人。",
+    "seed": 0,
+    "project_id": "benchs0-4",
+    "ok": true,
+    "export_path": "media/exports/ep_6186d90b2f27-1795528001.mp4",
+    "stages": [
+      {
+        "name": "create",
+        "ok": true,
+        "seconds": 0.1,
+        "detail": ""
+      },
+      {
+        "name": "script",
+        "ok": true,
+        "seconds": 20.7,
+        "detail": ""
+      },
+      {
+        "name": "confirm",
+        "ok": true,
+        "seconds": 0.0,
+        "detail": ""
+      },
+      {
+        "name": "entity[1/12]阿明",
+        "ok": true,
+        "seconds": 15.1,
+        "detail": ""
+      },
+      {
+        "name": "entity[2/12]小雯",
+        "ok": true,
+        "seconds": 16.2,
+        "detail": ""
+      },
+      {
+        "name": "entity[3/12]便利店外街道",
+        "ok": true,
+        "seconds": 12.3,
+        "detail": ""
+      },
+      {
+        "name": "entity[4/12]便利店收银台前",
+        "ok": true,
+        "seconds": 12.5,
+        "detail": ""
+      },
+      {
+        "name": "entity[5/12]便利店货架区",
+        "ok": true,
+        "seconds": 6.0,
+        "detail": ""
+      },
+      {
+        "name": "entity[6/12]便利店通道",
+        "ok": true,
+        "seconds": 5.7,
+        "detail": ""
+      },
+      {
+        "name": "entity[7/12]便利店门口",
+        "ok": true,
+        "seconds": 12.2,
+        "detail": ""
+      },
+      {
+        "name": "entity[8/12]外卖保温箱",
+        "ok": true,
+        "seconds": 21.7,
+        "detail": ""
+      },
+      {
+        "name": "entity[9/12]智能手机",
+        "ok": true,
+        "seconds": 21.5,
+        "detail": ""
+      },
+      {
+        "name": "entity[10/12]扫描枪",
+        "ok": true,
+        "seconds": 19.3,
+        "detail": ""
+      },
+      {
+        "name": "entity[11/12]灭火器",
+        "ok": true,
+        "seconds": 20.5,
+        "detail": ""
+      },
+      {
+        "name": "entity[12/12]外卖包裹",
+        "ok": true,
+        "seconds": 21.8,
+        "detail": ""
+      },
+      {
+        "name": "storyboard",
+        "ok": true,
+        "seconds": 38.5,
+        "detail": ""
+      },
+      {
+        "name": "video",
+        "ok": true,
+        "seconds": 484.2,
+        "detail": ""
+      },
+      {
+        "name": "edit_ensure",
+        "ok": true,
+        "seconds": 0.0,
+        "detail": ""
+      },
+      {
+        "name": "audio",
+        "ok": false,
+        "seconds": 0.0,
+        "detail": "POST /api/projects/benchs0-4/audio -> HTTP 400: {\"error\":\"Edge 配音失败（音色 zh-CN-XiaoxiaoNeural）。\"}"
+      },
+      {
+        "name": "edit_rebuild",
+        "ok": true,
+        "seconds": 0.0,
+        "detail": ""
+      },
+      {
+        "name": "export",
+        "ok": true,
+        "seconds": 9.2,
+        "detail": ""
+      }
+    ],
+    "shots": 12,
+    "shot_seconds": 47,
+    "entity_stills": 12,
+    "total_seconds": 738.2,
+    "error": "",
+    "notes": "resolution=480p"
+  }
+]

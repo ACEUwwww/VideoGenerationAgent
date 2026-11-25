@@ -85,3 +85,9 @@ bench/logs/
 !bench/results/om_matched_v2/
 bench/results/om_matched_v2/*
 !bench/results/om_matched_v2/*.json
+# Prompt ablation: the report is versioned, the 450 clips stay local.
+!bench/results/prompt_ablation.md
+!bench/results/prompt_ablation/
+bench/results/prompt_ablation/*
+!bench/results/prompt_ablation/*.json
+!bench/results/prompt_ablation/*.jsonl

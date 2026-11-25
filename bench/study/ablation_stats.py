@@ -58,17 +58,25 @@ def parse_score(reply: str) -> float | None:
 
 
 def load() -> list[dict]:
+    """Scored rows, one per (arm, model, brief, repeat).
+
+    The log is append-only and a cell can be written twice — a pilot pass
+    followed by a full pass, or a resume after an interrupt. Keeping the last
+    row per key makes the analysis idempotent instead of letting a duplicated
+    cell double-count in every mean and every paired contrast.
+    """
     if not LOG.exists():
         return []
-    rows = []
+    latest: dict[tuple[str, str, int, int], dict] = {}
     for line in LOG.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         row = json.loads(line)
         row["score"] = parse_score(row.get("reply", ""))
-        if row["score"] is not None:
-            rows.append(row)
-    return rows
+        if row["score"] is None:
+            continue
+        latest[(row["arm"], row["model"], row["brief_index"], row["repeat"])] = row
+    return list(latest.values())
 
 
 def load_noise_floor() -> float | None:
@@ -169,17 +177,26 @@ def main() -> int:
         reversed_p = sign_test([-d for d in diffs])[3] if mean_diff < 0 else None
         effect_p = reversed_p if reversed_p is not None else p
         direction = "as predicted" if mean_diff > 0 else ("reversed" if mean_diff < 0 else "none")
-        verdict = ""
-        if noise is not None:
-            verdict = ("below noise floor — not evidence"
-                       if abs(mean_diff) < noise else "above noise floor")
+        # Decision rule: does the paired confidence interval exclude zero?
+        #
+        # An earlier version compared |mean_diff| to the within-cell range from
+        # noise_floor.json. That was wrong twice over: the range is a property
+        # of ONE score across repeats, not of a paired DIFFERENCE, and pairing
+        # removes most of the render-to-render variation the range measures. It
+        # suppressed a contrast with 13 of 14 concordant pairs and p = 0.0009
+        # because its mean (0.78) fell just under the range (1.0). The interval
+        # is the honest test; the noise floor is context about one observation.
+        excludes_zero = (lo > 0 and hi > 0) or (lo < 0 and hi < 0)
+        verdict = "paired CI excludes zero" if excludes_zero else "paired CI includes zero"
+        extra = f" p_effect={effect_p} ({direction})" if reversed_p is not None else ""
         results[f"{better}-{worse}"] = {
             "question": question, "n": len(diffs),
             "mean_diff": mean_diff,
             "ci95": [lo, hi], "wins": wins, "ties": ties, "losses": losses,
             "p_predicted_direction": p, "p_reversed": reversed_p,
             "p_effect": effect_p, "direction": direction,
-            "noise_floor": noise, "verdict": verdict,
+            "single_observation_noise_range": noise,
+            "verdict": verdict,
         }
         extra = f" p_effect={effect_p} ({direction})" if reversed_p is not None else ""
         print(f"  {better} - {worse}: {mean_diff:+.3f} "
