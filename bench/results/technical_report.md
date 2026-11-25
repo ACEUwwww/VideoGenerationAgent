@@ -260,6 +260,15 @@ Design notes that bound the result:
 - The independent arm's prompt is identical in every repeat, so its spread across
   repeats is **render noise alone**. That makes it a control rather than a second
   treatment.
+
+> **Follow-up (2026-11-25): the two arms differ in three things, and only one of
+> them does the work.** A five-arm factorial ablation on 450 clips — every arm
+> derived from one planner output, so only the prompt string changes — isolates
+> the appearance anchor from plan-derived scene content and from length. The
+> anchor moves the score in three independent contrasts (CI excludes zero in all
+> three); scene content alone does not (CI includes zero). See
+> [`prompt_ablation.md`](prompt_ablation.md). The gain reported here is real, but
+> it is the anchor's gain, not "carried state" as a bundle.
 - The planner's output is cached per (brief, repeat) and shared between models: it is
   a text artefact, and the same story uses the same prompt on either checkpoint.
 - Repeat 0 uses seeds 0–4, the band the earlier single-pass study used.
@@ -305,6 +314,15 @@ Why 5 and not 12: a local clip costs 40–70 s of GPU, and the metric is a relat
 between frames rather than a function of shot count. The shot-count difference is
 disclosed wherever the numbers appear, and the full 12-shot OpenMontage score is
 quoted alongside the 5-shot subsample.
+
+> **Superseded (2026-11-25): the comparison below is not configuration-matched.**
+> A rerun holds checkpoint, seed policy, clip length **and shot count (12/12)**
+> fixed on both sides, and additionally fixes two defects found while wiring it:
+> OpenMontage's character references selected an image-to-video checkpoint that
+> returned HTTP 500 for every shot, and its Chinese shot prompts reached an
+> English-only text encoder untranslated. Result: OpenMontage **2.0**, ours
+> **3.0** — half of the gap quoted here was configuration. See
+> [`om_matched_v2.md`](om_matched_v2.md).
 
 ### 4.4 The metric
 
