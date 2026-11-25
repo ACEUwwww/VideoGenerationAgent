@@ -67,11 +67,32 @@ OUT = ROOT / "bench/results/prompt_ablation"
 BRIEFS = ROOT / "bench/study/briefs.json"
 SHOTS = 5
 
-ARMS = ("brief_en", "brief_en_anchor", "scene", "planned", "planned_trunc")
+ARMS = ("brief_en", "brief_en_anchor", "scene", "planned", "planned_trunc", "planned_padded")
 
 # The length-control arm keeps this share of the planned prompt. 0.45 puts it in
 # the same band as the other short arms without matching any one of them.
 TRUNC_FRACTION = 0.45
+
+# The first length arm (``planned_trunc``) failed as a length control: cutting
+# the tail of the planned prompt removed 296 of 296 appearance clauses, because
+# the planner writes scene first and appearance second. ``planned_padded`` pads
+# the *full* planned prompt with neutral production vocabulary — lens, light,
+# texture, grade — so the anchor and the scene content are byte-identical to the
+# ``planned`` arm and only the length changes. Nothing in the padding describes
+# a person. Length doubling is the target.
+PAD_TARGET_RATIO = 2.0
+PAD_FILLER = (
+    "shot on a 35mm cinema camera with a fast prime lens",
+    "shallow depth of field with soft falloff at the edges",
+    "fine film grain across the frame",
+    "controlled practical lighting with visible light wrapping",
+    "subtle atmospheric haze catching the key light",
+    "rich shadow detail retained without crushing blacks",
+    "gentle highlight rolloff, no clipping on the brightest surfaces",
+    "muted teal-and-amber colour grade with lifted shadows",
+    "steady handheld framing with a slow drift",
+    "crisp micro-texture on every surface in the frame",
+)
 
 # Appearance-only vocabulary. A clause carrying any of these is describing the
 # character, not the scene — that is the whole basis of the split, so the list
@@ -183,6 +204,30 @@ def truncate_to(prompt: str, fraction: float) -> str:
     return out or prompt[:limit]
 
 
+def pad_to_ratio(prompt: str, ratio: float) -> str:
+    """Append neutral production vocabulary until the prompt reaches ``ratio`` length.
+
+    Nothing appended here describes a person, so the appearance anchor and the
+    scene content stay byte-identical to the source prompt and only the total
+    length moves. That is what makes this a length control whereas
+    ``planned_trunc`` was not.
+    """
+    target = int(len(prompt) * ratio)
+    out = prompt.rstrip(",; ")
+    index = 0
+    while len(out) < target:
+        clause = PAD_FILLER[index % len(PAD_FILLER)]
+        candidate = f"{out}, {clause}"
+        if len(candidate) > target and index > 0:
+            # One more clause would overshoot past the target; stop rather than
+            # land far past it, which would make the two arms differ by more
+            # than the stated ratio.
+            break
+        out = candidate
+        index += 1
+    return out
+
+
 def build_arms(brief_en: str, prompt: str) -> dict[str, dict]:
     """Every arm for one shot, each with the text and how it was made.
 
@@ -200,6 +245,7 @@ def build_arms(brief_en: str, prompt: str) -> dict[str, dict]:
         "scene": {"text": join(scene)},
         "planned": {"text": planned},
         "planned_trunc": {"text": truncate_to(planned, TRUNC_FRACTION)},
+        "planned_padded": {"text": pad_to_ratio(planned, PAD_TARGET_RATIO)},
     }
     for entry in arms.values():
         entry["chars"] = len(entry["text"])

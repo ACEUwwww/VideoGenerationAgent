@@ -40,7 +40,13 @@ CONTRASTS = (
     ("brief_en", "scene", "plan content, anchor absent"),
     ("scene", "planned", "anchor effect, scene content present"),
     ("brief_en", "brief_en_anchor", "anchor effect, scene content absent"),
-    ("planned", "planned_trunc", "prompt length"),
+    # NOT a length contrast despite the name: measuring the arm showed 0 of 296
+    # appearance clauses survive the cut, so this compares anchor-present with
+    # anchor-absent. Kept because it is a third, independent anchor replication.
+    ("planned", "planned_trunc", "anchor effect, via truncation (not length)"),
+    # The real length control: same anchor, same scene, padded with neutral
+    # production vocabulary to ~2x length.
+    ("planned", "planned_padded", "prompt length, anchor and scene held constant"),
 )
 
 _SCORE = re.compile(r"SCORE:\s*\**\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
