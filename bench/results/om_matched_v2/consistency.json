@@ -1,0 +1,20 @@
+[
+  {
+    "score": 2.0,
+    "changed": "Face and Facial Features",
+    "why": "The face and facial features are consistently obscured or indistinct across most frames, making it difficult to confirm identity based on those traits.",
+    "raw": "**SCORE:** 2  \n**CHANGED:** Face and Facial Features  \n**WHY:** The face and facial features are consistently obscured or indistinct across most frames, making it difficult to confirm identity based on those traits.",
+    "label": "openmontage:benchs0-5",
+    "shots": 12,
+    "elapsed_s": 2.6
+  },
+  {
+    "score": 3.0,
+    "changed": "Clothing",
+    "why": "The main character's clothing changes significantly across the frames, including different jackets, aprons, and accessories, while other traits like face and body build remain consistent.",
+    "raw": "**SCORE:** 3  \n**CHANGED:** Clothing  \n**WHY:** The main character's clothing changes significantly across the frames, including different jackets, aprons, and accessories, while other traits like face and body build remain consistent.",
+    "label": "ours:matched_v2",
+    "shots": 12,
+    "elapsed_s": 2.5
+  }
+]

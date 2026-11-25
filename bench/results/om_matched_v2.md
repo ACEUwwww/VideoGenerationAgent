@@ -79,15 +79,53 @@ left untouched.
 
 ## Result
 
-*(filled in after scoring — see the table below)*
-
 | Arm | Shots | Cross-shot consistency (1–5) | Largest changed trait |
 | --- | ---: | ---: | --- |
-| OpenMontage | 12 | | |
-| Ours | 12 | | |
+| OpenMontage | 12 | **2.0** | Face and Facial Features |
+| Ours | 12 | **3.0** | Clothing |
 
-Read against the judge's measured noise: on an **unchanged** prompt the score
-moves about **1.0 point** on average and up to **2.0 points**
-([`noise_floor.json`](noise_floor.json)). A difference smaller than that is not
-evidence of an effect, and with n = 1 per side even a larger difference is a
-worked example rather than a measured effect.
+Judge's reason, verbatim:
+
+> **OpenMontage (2.0):** *"the face and facial features are inconsistent across
+> the frames, with some showing a person wearing glasses and others showing
+> indistinct or obscured faces."*
+
+> **Ours (3.0):** *"the main character's face, hairstyle, and body build remain
+> consistent across most frames, but there is a noticeable change in clothing in
+> Shot 4."*
+
+The same pattern as before — ours holds the face and loses wardrobe on one
+shot; OpenMontage loses the face itself — but the size of the gap is not the
+same.
+
+## What this changes about the earlier claim
+
+| Comparison | Gap |
+| --- | ---: |
+| Earlier run (OM 12 shots vs ours 5 shots) | 2.0 vs 4.0 → **2.0 points** |
+| This run (both 12 shots, matched config) | 2.0 vs 3.0 → **1.0 point** |
+
+**Half the earlier gap was the configuration, not the orchestration.** Ours
+scored 4.0 on a 5-shot episode and 3.0 on a 12-shot one from the same brief and
+planner — so a five-shot episode is systematically easier to look consistent on,
+and the earlier comparison handed our side that advantage.
+
+Against the measured noise floor of ~1.0 point on an unchanged prompt
+([`noise_floor.json`](noise_floor.json)), the remaining 1-point difference is
+**at the resolution limit of this metric**. With n = 1 per side there is no
+statistical claim to make: what this run supports is that the direction is
+unchanged and the magnitude was previously overstated.
+
+## Honest reading
+
+- The direction (ours above OpenMontage on cross-shot character consistency)
+  survives full configuration control.
+- The magnitude does not. The defensible statement is a **1-point** difference
+  on one episode, not a 2-point one.
+- Neither number is distinguishable from render/judge noise at n = 1.
+- OpenMontage's remaining handicap is not configuration: its own prompts retain
+  an `@entity` reference syntax (`@阿明-外卖骑手装`) and per-shot Chinese staging
+  notes that survive translation as literal text. That is what its workflow
+  actually emits, so it is left alone — but it is another reason not to read
+  this as a clean estimate of orchestration quality.
+
