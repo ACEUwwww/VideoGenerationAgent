@@ -322,7 +322,17 @@ def run_local_shot(
         # foreign ids to the local checkpoint is the backend's job: it is the
         # component that knows what it can actually run.
         local = {"cogvideox5b", "cogvideox5b_i2v", "wan21_1_3b", "longlive_1_3b"}
-        if model not in local:
+        # The reference arm is text-to-video, so this side must be too. The
+        # studio attaches entity references to shots whenever a character bible
+        # exists, which selected the i2v checkpoint; that checkpoint needs a
+        # real first frame and returned HTTP 500 for every shot when the
+        # reference was unusable (56 of 56 in the first v2 attempt). Forcing
+        # t2v keeps the model invocation identical on both sides.
+        force_t2v = str(os.environ.get("LOCAL_VIDEO_FORCE_T2V", "0")).lower() in {"1", "true", "yes"}
+        if force_t2v:
+            chosen = "cogvideox5b"
+            ref_path = None
+        elif model not in local:
             chosen = "cogvideox5b_i2v" if ref_path else "cogvideox5b"
         elif not ref_path and "i2v" in model:
             chosen = "cogvideox5b"
@@ -331,10 +341,31 @@ def run_local_shot(
         else:
             chosen = model
 
+        # Params parity with the reference arm. The prior run left these at the
+        # adapter's defaults — seed 0 for every shot and whatever duration the
+        # storyboard asked for — while our side used seed = shot index and a
+        # fixed 5 s. Those are model-invocation parameters, not orchestration,
+        # so controlling them here keeps the comparison about the workflow.
+        #
+        # Seed: the shot's 0-based position within its episode, matching
+        # `bench/study/tier3a_story.py:render(..., seed=index, ...)`.
+        order = 0
+        if st0:
+            siblings = sorted(
+                (s for s in (st0.get("shots") or [])
+                 if not s.get("deletedAt") and s.get("episodeId") == (sh0 or {}).get("episodeId")),
+                key=lambda s: int(s.get("shotOrder") or 0),
+            )
+            order = next((i for i, s in enumerate(siblings) if s["id"] == shot_id), 0)
+        # Duration: the local checkpoint renders fixed 5 s clips in the reference
+        # arm; a longer request here would differ by clip length, not by
+        # workflow. Recorded so the report can state it.
+        seconds = float(os.environ.get("LOCAL_VIDEO_SECONDS", "5"))
+
         response = requests.post(
             f"{RENDER_URL}/render/video",
-            json={"model": chosen, "prompt": prompt_used, "seconds": float(duration or 5),
-                  "seed": 0, "image": ref_path},
+            json={"model": chosen, "prompt": prompt_used, "seconds": seconds,
+                  "seed": order, "image": ref_path},
             timeout=RENDER_TIMEOUT,
         )
         response.raise_for_status()

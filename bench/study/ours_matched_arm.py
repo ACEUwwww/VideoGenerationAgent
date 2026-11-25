@@ -39,11 +39,15 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--model", default="cogvideox5b")
     parser.add_argument("--shots", type=int, default=5)
     parser.add_argument("--tag", default="ours")
+    parser.add_argument("--out", type=Path, default=OUT,
+                        help="output root; keep each rerun in its own directory so "
+                             "an earlier evidence set is never overwritten")
     args = parser.parse_args(argv[1:])
 
     import tier3a_story as story
 
-    OUT.mkdir(parents=True, exist_ok=True)
+    out = args.out
+    out.mkdir(parents=True, exist_ok=True)
 
     print(f"driving our pipeline on the matched brief ({args.model}, {args.shots} shots)", flush=True)
     started = time.monotonic()
@@ -57,7 +61,7 @@ def main(argv: list[str]) -> int:
     paths: list[str] = []
     for index, text in enumerate(prompts):
         t0 = time.monotonic()
-        path = story.render(text, index, args.model, args.tag, OUT, index)
+        path = story.render(text, index, args.model, args.tag, out, index)
         if path:
             paths.append(str(path))
         print(f"  shot {index}: {time.monotonic()-t0:.0f}s", flush=True)
@@ -66,8 +70,8 @@ def main(argv: list[str]) -> int:
         "arm": "planned", "model": args.model, "brief": BRIEF,
         "shots": paths, "prompt_chars": [len(t) for t in prompts],
     }
-    (OUT / "clips.jsonl").write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"{len(paths)} clips -> {OUT / 'clips.jsonl'}", flush=True)
+    (out / "clips.jsonl").write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"{len(paths)} clips -> {out / "clips.jsonl"}", flush=True)
     return 0
 
 

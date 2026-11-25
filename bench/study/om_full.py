@@ -317,7 +317,11 @@ def run_episode(brief: str, seed: int, *, resolution: str = "480p",
         # One generation per shot, not per segment. A segment is 10-15s and the
         # studio renders all its beats in a single Seedance call, which would
         # make each clip ~3x ours and the comparison a duration difference.
-        started = _stage(stages, "video", lambda: call("POST", f"/api/projects/{pid}/storyboard", {
+        # Named ``video_stage``, not ``started``: reusing ``started`` here
+        # overwrote the episode's start timestamp, so the closing
+        # ``time.monotonic() - started`` subtracted a float from a dict and
+        # crashed after every clip had already been rendered and paid for.
+        video_stage = _stage(stages, "video", lambda: call("POST", f"/api/projects/{pid}/storyboard", {
             "action": "batch-video",
             "episodeId": episode_id,
             "shotIds": shot_ids,
@@ -336,7 +340,7 @@ def run_episode(brief: str, seed: int, *, resolution: str = "480p",
         # two of fifteen shots came back with no task id and no error surfaced
         # anywhere, so the shot count looked complete while two shots had never
         # been submitted. Reading ``started`` is the only way to see it.
-        rejected = [row for row in (started.get("started") or []) if row.get("error")]
+        rejected = [row for row in (video_stage.get("started") or []) if row.get("error")]
         if rejected:
             raise RuntimeError(f"studio refused {len(rejected)}/{len(shot_ids)} shots: "
                                f"{rejected[0].get('error')}")
@@ -387,6 +391,9 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--briefs", type=Path, default=ROOT / "bench/study/briefs.json")
     parser.add_argument("--seeds", nargs="+", type=int, default=[0])
     parser.add_argument("--resolution", default="480p")
+    parser.add_argument("--max-shots", type=int, default=15,
+                        help="trim the studio's storyboard to at most this many shots; "
+                             "0 keeps whatever the studio planned")
     parser.add_argument("--out", type=Path, default=OUT_ROOT)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--resume-project", default="",
@@ -429,7 +436,8 @@ def main(argv: list[str]) -> int:
         indent=2, ensure_ascii=False), encoding="utf-8")
     for index, (brief, seed) in enumerate(plan, start=1):
         print(f"  [{index}/{len(plan)}] seed={seed} {brief[:50]!r}", flush=True)
-        row = run_episode(brief, seed, resolution=args.resolution).__dict__
+        row = run_episode(brief, seed, resolution=args.resolution,
+                          max_shots=args.max_shots).__dict__
         results.append(row)
         print(f"  -> ok={row['ok']} shots={row['shots']} export={row['export_path'][:60]!r} "
               f"err={row['error'][:100]!r}", flush=True)
