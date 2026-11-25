@@ -461,6 +461,13 @@ the brief already constrains the character in language.**
 | OpenMontage, first 5 shots of that episode | 5 | **2.0** |
 | Ours, same brief | 5 | **4.0** |
 
+> **Superseded (2026-11-25).** This table compared 12 shots against 5. A rerun
+> with the configuration matched on both sides — same checkpoint, seed policy,
+> clip length, **and shot count (12/12)** — gives OpenMontage **2.0** and ours
+> **3.0**. Half of the gap below was configuration, not orchestration. See
+> [`om_matched_v2.md`](om_matched_v2.md). The numbers here are kept because the
+> section's reasoning about *what* drifted still holds; the magnitude does not.
+
 The judge's reasons name what drifted, and they are more informative than the scores:
 
 > **OpenMontage, 5 shots (2.0):** *"the face and facial features are inconsistent across
