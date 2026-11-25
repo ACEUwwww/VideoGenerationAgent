@@ -82,6 +82,31 @@ def _has_cjk(text: str) -> bool:
     return bool(_CJK.search(text or ""))
 
 
+def _translate_for_encoder(text: str) -> str:
+    """Module-level translation for call paths that are not the stills backend.
+
+    The stills backend has this as a method; the video path is a module-level
+    function and had no equivalent, so the studio's Chinese shot prompts went
+    straight to CogVideoX's English-only encoder. That is the same defect the
+    stills path already documents — a Chinese prompt tokenises into fragments
+    the encoder has no representation for — and leaving it in place would
+    handicap one side of the comparison for a reason that belongs to the
+    substituted model rather than to the workflow being measured.
+
+    Shares ``_TRANSLATION_CACHE`` with the stills backend so a prompt repeated
+    across QA retries is translated once.
+    """
+    cleaned = (text or "").strip()
+    if not cleaned or not _has_cjk(cleaned):
+        return cleaned
+    cached = _TRANSLATION_CACHE.get(cleaned)
+    if cached:
+        return cached
+    translated = _translate_with_llm(cleaned)
+    _TRANSLATION_CACHE[cleaned] = translated
+    return translated
+
+
 def _translate_with_llm(text: str) -> str:
     """Ask the planner LLM for a literal English rendering of a Chinese prompt.
 
@@ -309,6 +334,9 @@ def run_local_shot(
         st0 = store.load(project_id)
         sh0 = next((x for x in (st0.get("shots") or []) if x["id"] == shot_id), None) if st0 else None
         prompt_used = base_prompt or (sh0 or {}).get("prompt") or ""
+        # The studio writes shot prompts in Chinese; CogVideoX's text encoder is
+        # English-only. See ``_translate_for_encoder``.
+        prompt_used = _translate_for_encoder(prompt_used)
 
         # An i2v checkpoint cannot render without a first frame, and a t2v
         # checkpoint has nothing to do with one. The studio decides which by

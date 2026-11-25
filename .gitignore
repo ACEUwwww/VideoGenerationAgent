@@ -80,3 +80,8 @@ bench/_smoke/
 bench/logs/
 # Noise floor of the consistency judge, derived from the repeat study.
 !bench/results/noise_floor.json
+# Matched-configuration rerun of the OpenMontage comparison.
+!bench/results/om_matched_v2.md
+!bench/results/om_matched_v2/
+bench/results/om_matched_v2/*
+!bench/results/om_matched_v2/*.json
